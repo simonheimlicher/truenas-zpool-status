@@ -14,15 +14,22 @@ Consistency: We clone the snapshot tree rather than traversing .zfs/snapshot,
 which would still show live child dataset mountpoints instead of their snapshot
 contents. The clone tree provides a truly immutable, consistent view.
 
+Dropbox Rate Limiting: Dropbox aggressively rate-limits API operations and
+triggers 300-second lockouts if exceeded. The --tpslimit option (default: 12)
+throttles transactions per second to avoid this. Testing shows 12 TPS is safe
+for Dropbox Plus; 24 TPS triggers lockouts.
+
 Requirements:
     - TrueNAS SCALE 25.10+ (Python 3.11+, rclone pre-installed)
     - rclone configured with your Dropbox account
     - ZFS dataset to back up
 
 Usage:
-    /mnt/system/admin/dropbox-push/dropbox-push.py apps/config dropbox:TrueNAS-Backup/apps-config --rclone-config /mnt/system/admin/dropbox-push/rclone.conf
-    /mnt/system/admin/dropbox-push/dropbox-push.py apps/data dropbox:TrueNAS-Backup/apps-data --rclone-config /mnt/system/admin/dropbox-push/rclone.conf --dry-run -v
-    /mnt/system/admin/dropbox-push/dropbox-push.py apps/config dropbox:Backup --rclone-config /mnt/system/admin/dropbox-push/rclone.conf --keep-versions 3
+    dropbox-push.py apps/config dropbox:Backup/apps-config
+    dropbox-push.py apps/config dropbox:Backup/apps-config -v          # Show progress
+    dropbox-push.py apps/config dropbox:Backup/apps-config -vv         # Show all files
+    dropbox-push.py apps/config dropbox:Backup/apps-config --tpslimit 10  # Slower but safer
+    dropbox-push.py apps/config dropbox:Backup/apps-config --dry-run -v
 
 Author: Simon Heimlicher
 License: MIT
@@ -50,7 +57,12 @@ _terminate_requested = False
 _active_child_process: subprocess.Popen[str] | None = None
 
 # Constants
-DEFAULT_TRANSFERS = 8  # Balanced default for Dropbox (higher risks rate limits)
+# Dropbox aggressively rate-limits concurrent operations to the same namespace.
+# The tpslimit (transactions per second) is the key throttle to avoid 300s lockouts.
+# 12 TPS works reliably for Dropbox Plus based on community testing.
+# See: https://forum.rclone.org/t/dropbox-too-many-requests-or-write-operations-trying-again-in-300-seconds/38816
+DEFAULT_TRANSFERS = 64
+DEFAULT_TPSLIMIT = 12
 SNAPSHOT_PREFIX = "dropboxpush"
 CLONE_SUFFIX = ".dropboxpush"
 VERSIONS_DIR = ".versions"
@@ -736,14 +748,7 @@ def destroy_clone_tree(clone_root: str, logger: logging.Logger) -> None:
         logger.debug("Clone tree does not exist, nothing to destroy")
         return
 
-    # Force unmount first to release any file handles (e.g., from interrupted rclone)
-    run_command(
-        ["zfs", "unmount", "-f", clone_root],
-        logger,
-        check=False,
-    )
-
-    # Destroy recursively with force to handle busy datasets
+    # Destroy recursively with force (handles unmount automatically)
     result = run_command(
         ["zfs", "destroy", "-rf", clone_root],
         logger,
@@ -752,7 +757,9 @@ def destroy_clone_tree(clone_root: str, logger: logging.Logger) -> None:
     )
 
     if result.returncode != 0:
-        logger.warning(f"Failed to destroy clone tree (may need manual cleanup): {clone_root}")
+        error_msg = result.stderr.strip() if result.stderr else "unknown error"
+        logger.warning(f"Failed to destroy clone tree: {error_msg}")
+        logger.warning(f"Manual cleanup required: sudo zfs destroy -rf {clone_root}")
     else:
         logger.debug("Clone tree destroyed successfully")
 
@@ -825,9 +832,9 @@ def run_rclone_sync(
     config_path: Path,
     transfers: int,
     checkers: int,
+    tpslimit: int,
     dry_run: bool,
-    verbose: bool,
-    debug: bool,
+    verbose_level: int,
     keep_versions: int,
     timestamp: str,
     logger: logging.Logger,
@@ -836,6 +843,11 @@ def run_rclone_sync(
 
     If keep_versions > 0, uses --backup-dir to preserve changed/deleted files
     in a versioned subdirectory.
+
+    Output filtering based on verbose_level:
+        0: Only rate limit errors (for cron email alerts)
+        1: Progress summaries but not individual file transfers
+        2+: Everything including each file transfer
     """
     cmd = [
         RCLONE_BIN,
@@ -850,7 +862,9 @@ def run_rclone_sync(
         "--retries", "3",
         "--low-level-retries", "10",
         "--links",  # Preserve symlinks as .rclonelink files (Dropbox doesn't support symlinks)
-        "--dropbox-batch-mode", "async",  # Batch uploads for better performance
+        "--tpslimit", str(tpslimit),  # Limit Dropbox API transactions per second
+        "--order-by", "size,mixed,75",  # Optimize for large files first
+        "--max-backlog", "10000", # Limit memory usage for large syncs
     ]
 
     # Add backup-dir for versioning if enabled
@@ -862,14 +876,12 @@ def run_rclone_sync(
     if dry_run:
         cmd.append("--dry-run")
 
-    if debug:
-        cmd.extend(["--verbose", "--verbose"])
-    elif verbose:
-        cmd.append("--verbose")
+    # Always use rclone verbose to get progress info, we filter on our side
+    cmd.append("--verbose")
 
     action = "Dry run" if dry_run else "Syncing"
     logger.info(f"{action}: {source} -> {destination}")
-    logger.debug(f"Transfers: {transfers}, Checkers: {checkers}")
+    logger.debug(f"Transfers: {transfers}, Checkers: {checkers}, TPS limit: {tpslimit}")
 
     # Check for termination before starting long-running operation
     check_termination()
@@ -884,6 +896,42 @@ def run_rclone_sync(
     )
     _active_child_process = process
 
+    def should_show_line(line: str) -> bool:
+        """Determine if a line should be shown based on verbose_level.
+
+        Level 0: Only errors and rate limit notices (for cron email alerts)
+        Level 1: Progress summaries (Transferred:, Checks:, etc.) but not individual files
+        Level 2+: Everything including individual file transfers
+        """
+        # Always show NOTICE (rate limits, errors) - important for cron alerts
+        # But filter out the unhelpful Dropbox modification time notice
+        if "NOTICE:" in line:
+            if "Forced to upload files to set modification times" in line:
+                return False
+            return True
+        # Always show ERROR
+        if "ERROR:" in line:
+            return True
+
+        if verbose_level == 0:
+            return False
+
+        if verbose_level == 1:
+            # Show progress lines but not individual file transfers
+            # Individual file lines look like: "INFO  : path/to/file: Copied (new)"
+            # Progress lines look like: "INFO  : \nTransferred:" or "INFO  : Starting transaction"
+            if "INFO  :" in line:
+                # Check if it's a file transfer line (contains ": Copied" or ": Moved" etc.)
+                if ": Copied (" in line or ": Moved (" in line or ": Deleted" in line:
+                    return False
+                # Skip "src and dst identical" lines too
+                if "src and dst identical" in line:
+                    return False
+            return True
+
+        # Level 2+: show everything
+        return True
+
     try:
         # Use deque to limit memory usage - only keep last 20 lines for error context
         output_lines: deque[str] = deque(maxlen=20)
@@ -891,10 +939,21 @@ def run_rclone_sync(
         for line in process.stdout:
             line = line.rstrip()
             output_lines.append(line)
-            if verbose or debug:
+            if should_show_line(line):
                 print(line, file=sys.stderr)
 
         process.wait()
+    except KeyboardInterrupt:
+        # User pressed Ctrl+C - terminate rclone and wait for it to release file handles
+        logger.debug("KeyboardInterrupt received, terminating rclone...")
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            logger.debug("rclone didn't exit gracefully, killing...")
+            process.kill()
+            process.wait()
+        raise  # Re-raise to propagate to main handler
     finally:
         _active_child_process = None
 
@@ -943,13 +1002,14 @@ Examples:
     )
     parser.add_argument(
         "-v", "--verbose",
-        action="store_true",
-        help="Enable verbose output",
+        action="count",
+        default=0,
+        help="Verbose output (-v for progress, -vv for all file transfers)",
     )
     parser.add_argument(
         "--debug",
         action="store_true",
-        help="Enable debug output (implies --verbose)",
+        help="Enable debug output (implies -vv)",
     )
     parser.add_argument(
         "--transfers",
@@ -957,6 +1017,13 @@ Examples:
         default=DEFAULT_TRANSFERS,
         metavar="N",
         help=f"Number of file transfers to run in parallel (default: {DEFAULT_TRANSFERS})",
+    )
+    parser.add_argument(
+        "--tpslimit",
+        type=int,
+        default=DEFAULT_TPSLIMIT,
+        metavar="N",
+        help=f"Limit Dropbox API transactions per second (default: {DEFAULT_TPSLIMIT})",
     )
     parser.add_argument(
         "--keep-versions",
@@ -994,8 +1061,10 @@ def main() -> None:
 
     args = parse_args()
 
-    verbose = args.verbose or args.debug
-    logger = setup_logging(verbose=verbose, debug=args.debug)
+    # Verbosity levels: 0=errors only, 1=progress, 2+=all file transfers
+    # --debug implies -vv
+    verbose_level = args.verbose if not args.debug else max(args.verbose, 2)
+    logger = setup_logging(verbose=verbose_level >= 1, debug=args.debug)
 
     # Calculate checkers (2x transfers, capped at 64)
     checkers = min(args.transfers * 2, 64)
@@ -1076,9 +1145,9 @@ def main() -> None:
                     config_path=args.rclone_config,
                     transfers=args.transfers,
                     checkers=checkers,
+                    tpslimit=args.tpslimit,
                     dry_run=args.dry_run,
-                    verbose=verbose,
-                    debug=args.debug,
+                    verbose_level=verbose_level,
                     keep_versions=args.keep_versions,
                     timestamp=timestamp,
                     logger=logger,
