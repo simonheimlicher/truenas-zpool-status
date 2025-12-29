@@ -50,7 +50,7 @@ _terminate_requested = False
 _active_child_process: subprocess.Popen[str] | None = None
 
 # Constants
-DEFAULT_TRANSFERS = 4  # Conservative default for Dropbox rate limits
+DEFAULT_TRANSFERS = 8  # Balanced default for Dropbox (higher risks rate limits)
 SNAPSHOT_PREFIX = "dropboxpush"
 CLONE_SUFFIX = ".dropboxpush"
 VERSIONS_DIR = ".versions"
@@ -850,8 +850,7 @@ def run_rclone_sync(
         "--retries", "3",
         "--low-level-retries", "10",
         "--links",  # Preserve symlinks as .rclonelink files (Dropbox doesn't support symlinks)
-        "--tpslimit", "12",  # Dropbox API rate limit (12 requests/sec)
-        "--tpslimit-burst", "1",  # Minimal bursting to stay within limits
+        "--dropbox-batch-mode", "async",  # Batch uploads for better performance
     ]
 
     # Add backup-dir for versioning if enabled
