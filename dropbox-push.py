@@ -50,7 +50,7 @@ _terminate_requested = False
 _active_child_process: subprocess.Popen[str] | None = None
 
 # Constants
-DEFAULT_TRANSFERS = 16
+DEFAULT_TRANSFERS = 4  # Conservative default for Dropbox rate limits
 SNAPSHOT_PREFIX = "dropboxpush"
 CLONE_SUFFIX = ".dropboxpush"
 VERSIONS_DIR = ".versions"
@@ -783,7 +783,7 @@ def cleanup_old_versions(
         logger.debug("No versions directory found or error listing versions")
         return
 
-    # Parse and sort version directories (format: YYYYMMDDTHHMMSSZ/)
+    # Parse and sort version directories (format: YYYY-MM-DDTHH-MM-SSZ/)
     versions = sorted(
         [v.rstrip("/") for v in result.stdout.strip().split("\n") if v.strip()],
         reverse=True,  # Newest first
@@ -843,6 +843,8 @@ def run_rclone_sync(
         "--retries", "3",
         "--low-level-retries", "10",
         "--links",  # Preserve symlinks as .rclonelink files (Dropbox doesn't support symlinks)
+        "--tpslimit", "12",  # Dropbox API rate limit (12 requests/sec)
+        "--tpslimit-burst", "1",  # Minimal bursting to stay within limits
     ]
 
     # Add backup-dir for versioning if enabled
