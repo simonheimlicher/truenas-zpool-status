@@ -1,0 +1,20 @@
+[project]
+name = "cloud-mirror"
+version = "0.1.0"
+description = "ZFS-to-Dropbox sync utility for TrueNAS SCALE"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "specs"]
+markers = [
+    "zfs: mark test as requiring ZFS (deselect with '-m \"not zfs\"')",
+    "vm_required: mark test as requiring Colima VM to be running",
+    "slow: mark test as slow-running",
+]
