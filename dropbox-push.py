@@ -736,9 +736,16 @@ def destroy_clone_tree(clone_root: str, logger: logging.Logger) -> None:
         logger.debug("Clone tree does not exist, nothing to destroy")
         return
 
-    # Destroy recursively
+    # Force unmount first to release any file handles (e.g., from interrupted rclone)
+    run_command(
+        ["zfs", "unmount", "-f", clone_root],
+        logger,
+        check=False,
+    )
+
+    # Destroy recursively with force to handle busy datasets
     result = run_command(
-        ["zfs", "destroy", "-r", clone_root],
+        ["zfs", "destroy", "-rf", clone_root],
         logger,
         check=False,
         timeout=TIMEOUT_ZFS_RECURSIVE,
