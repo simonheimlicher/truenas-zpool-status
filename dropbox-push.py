@@ -34,6 +34,7 @@ import argparse
 import fcntl
 import hashlib
 import logging
+import os
 import re
 import signal
 import subprocess
@@ -54,10 +55,28 @@ SNAPSHOT_PREFIX = "dropboxpush"
 CLONE_SUFFIX = ".dropboxpush"
 VERSIONS_DIR = ".versions"
 RCLONE_BIN = "/usr/bin/rclone"
+RCLONE_CONFIG_FILENAME = "rclone.conf"
 LOCK_DIR = Path("/run")
 # ZFS user property to tag our clones (prevents accidental deletion of unrelated datasets)
 ZFS_USER_PROPERTY = "ch.srvr.dropboxpush:managed"
 ZFS_USER_PROPERTY_VALUE = "true"
+
+
+def get_script_dir() -> Path:
+    """Get the directory containing this script.
+
+    If the script is invoked via a symlink, returns the symlink's directory,
+    not the original file's directory. This allows placing rclone.conf next
+    to the symlink.
+    """
+    # sys.argv[0] gives the path as invoked (preserves symlinks)
+    # os.path.abspath makes it absolute without resolving symlinks
+    return Path(os.path.abspath(sys.argv[0])).parent
+
+
+def get_default_rclone_config() -> Path:
+    """Get the default rclone config path (same directory as script)."""
+    return get_script_dir() / RCLONE_CONFIG_FILENAME
 
 # Timeouts (seconds) - ZFS recursive operations can take much longer on large datasets
 TIMEOUT_ZFS_QUICK = 60  # Simple queries (get, list single dataset)
@@ -823,6 +842,7 @@ def run_rclone_sync(
         "--timeout", "300s",
         "--retries", "3",
         "--low-level-retries", "10",
+        "--links",  # Preserve symlinks as .rclonelink files (Dropbox doesn't support symlinks)
     ]
 
     # Add backup-dir for versioning if enabled
@@ -891,9 +911,10 @@ def parse_args() -> argparse.Namespace:
         description="Sync ZFS dataset to cloud storage via rclone with snapshot support.",
         epilog="""
 Examples:
-  %(prog)s apps/config dropbox:TrueNAS-Backup/apps-config --rclone-config /mnt/system/admin/dropbox-push/rclone.conf
-  %(prog)s apps/data dropbox:Backup/data --rclone-config /mnt/system/admin/dropbox-push/rclone.conf --dry-run -v
-  %(prog)s tank/media remote:Backup --rclone-config /mnt/tank/rclone/rclone.conf --transfers 8 --keep-versions 5
+  %(prog)s apps/config dropbox:TrueNAS-Backup/apps-config
+  %(prog)s apps/data dropbox:Backup/data --dry-run -v
+  %(prog)s tank/media remote:Backup --transfers 8 --keep-versions 5
+  %(prog)s apps/config dropbox:Backup --rclone-config /path/to/rclone.conf
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -949,9 +970,9 @@ Examples:
     parser.add_argument(
         "--rclone-config",
         type=Path,
-        required=True,
+        default=get_default_rclone_config(),
         metavar="PATH",
-        help="Path to rclone config file (required)",
+        help=f"Path to rclone config file (default: {RCLONE_CONFIG_FILENAME} in script directory)",
     )
 
     return parser.parse_args()
