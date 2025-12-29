@@ -142,7 +142,7 @@ dropbox:Backup/apps-config/
 │   └── config/
 ├── ...
 └── .versions/
-    ├── 20250115T031500Z/   # Older version
+    ├── 2025-01-15T03-15-00Z/   # Older version
     │   └── (changed/deleted files)
     └── 20250116T031500Z/   # More recent version
         └── (changed/deleted files)
@@ -153,7 +153,7 @@ dropbox:Backup/apps-config/
 1. **Acquires lock** to prevent concurrent runs on the same dataset
 2. **Validates** the ZFS dataset, rclone config, and remote
 3. **Enumerates** all datasets under the root (handles nested child datasets)
-4. **Creates recursive snapshot** (`apps/config@dropboxpush-20250115T031500Z`)
+4. **Creates recursive snapshot** (`apps/config@dropboxpush-2025-01-15T03-15-00Z`)
 5. **Creates clone tree** from snapshots:
    - `apps/config.dropboxpush` (clone of `apps/config@dropboxpush-...`)
    - `apps/config.dropboxpush/audiobookshelf` (clone of `apps/config/audiobookshelf@dropboxpush-...`)
@@ -261,7 +261,7 @@ zfs destroy -r apps/config.dropboxpush
 zfs list -t snapshot | grep dropboxpush
 
 # Destroy snapshots
-zfs destroy -r apps/config@dropboxpush-20250115T031500Z
+zfs destroy -r apps/config@dropboxpush-2025-01-15T03-15-00Z
 ```
 
 ## Important Notes
