@@ -381,11 +381,78 @@ non-functional requirements. See [templates](./templates/) for the full template
 
 ### Test Graduation
 
-When a work item is complete:
+**Tests are not just verification—they are regression protection.** When a work item is complete, tests graduate from specs to the global `tests/` directory where they serve as early warning signs for regressions.
 
-1. Tests move from `work-item/tests/` to `tests/{unit,integration,e2e}/`
-2. `DONE.md` is created referencing the graduated test locations
-3. Original test files in work item may be removed or kept for reference
+#### Graduation Steps
+
+1. **Refactor code to production quality** - No TODOs, no hacks, fully typed
+2. **Refactor tests for regression detection**:
+   - Order tests from trivial to complex (trivial tests catch obvious breakage fast)
+   - First test should verify basic availability (e.g., "is command available?")
+   - Later tests verify functional behavior
+3. **Move tests** from `specs/doing/.../story-XX/tests/` → `tests/{environment,unit,integration,e2e}/`
+4. **Create DONE.md** in story's `tests/` directory documenting graduation
+
+#### Test Ordering Strategy
+
+Tests should be ordered to fail fast on environment issues:
+
+```python
+# Good ordering - trivial first
+class TestColima:
+    def test_colima_command_available(self):     # 1. Is tool installed?
+        ...
+    def test_colima_status_works(self):          # 2. Does basic command work?
+        ...
+    def test_vm_running(self):                   # 3. Is VM running?
+        ...
+    def test_can_ssh_to_vm(self):                # 4. Can we connect?
+        ...
+    def test_can_execute_command(self):          # 5. Does execution work?
+        ...
+```
+
+#### DONE.md Contents
+
+```markdown
+# Completion Evidence: Story-XX
+
+## Graduated Tests
+
+| Requirement | Graduated To |
+| ----------- | ------------ |
+| FR1: ...    | `tests/environment/test_xxx.py::TestClass::test_name` |
+| FR2: ...    | `tests/environment/test_xxx.py::TestClass::test_other` |
+
+## Tests Remaining in Specs
+
+| Test | Rationale |
+| ---- | --------- |
+| (none or list) | (why not graduated) |
+
+## Verification
+
+- All tests pass: `uv run --extra dev pytest tests/ -v`
+- Code reviewed and refactored
+```
+
+#### Development vs Production Environments
+
+**Critical context for understanding test infrastructure:**
+
+| Aspect     | Development (macOS)    | Production (TrueNAS SCALE) |
+| ---------- | ---------------------- | -------------------------- |
+| **ZFS**    | Inside Colima VM       | Native (Linux kernel)      |
+| **Colima** | Required for testing   | Not present                |
+| **Tests**  | Run here only          | Never run in production    |
+| **rclone** | Mock remote (local fs) | Real Dropbox remote        |
+
+This means:
+
+- All ZFS tests execute commands **inside the Colima VM** via SSH
+- The `tests/` directory is **dev-only infrastructure**
+- Production runs `cloud-mirror.py` directly on TrueNAS where ZFS is native
+- Never assume ZFS commands run locally on the dev machine
 
 ### Filling Requirement Gaps
 

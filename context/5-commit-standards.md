@@ -6,9 +6,9 @@
 
 ### Automated Checks (All Must Pass)
 
-- [ ] **`uv run --with pytest pytest tests/ specs/`** shows **0** failed tests
-- [ ] **`uv run --with mypy mypy cloud-mirror.py`** shows **0** type errors (once type hints added)
-- [ ] **`uv run --with ruff ruff check cloud-mirror.py`** shows **0** errors (warnings acceptable)
+- [ ] **`uv run --extra dev pytest tests/ specs/`** shows **0** failed tests
+- [ ] **`uv run --extra dev mypy cloud-mirror.py`** shows **0** type errors (once type hints added)
+- [ ] **`uv run --extra dev ruff check cloud-mirror.py`** shows **0** errors (warnings acceptable)
 - [ ] **`python cloud-mirror.py --help`** succeeds (CLI smoke test)
 
 ### Manual Verification Requirements
