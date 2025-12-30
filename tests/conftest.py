@@ -1,19 +1,26 @@
 """
 Pytest fixtures for ZFS and rclone testing.
 
+IMPORTANT: Development vs Production Environment
+- Development (macOS): ZFS runs inside Colima VM, accessed via SSH
+- Production (TrueNAS SCALE): ZFS is native, no Colima
+
+All ZFS fixtures execute commands inside the Colima VM via SSH.
+Tests are dev-only infrastructure and never run in production.
+
 Test Categories:
 - Unit tests: Run anywhere (no ZFS needed) - direction detection, validation
-- ZFS tests: Require ZFS kernel modules - run on TrueNAS or Linux with ZFS
+- VM tests: Require Colima VM running with ZFS installed
 
 Usage:
-  # Run unit tests only (Docker or local)
-  pytest tests/ -m "not zfs"
+  # Run all tests (some may skip if VM not running)
+  uv run --extra dev pytest tests/ -v
 
-  # Run all tests (requires ZFS)
-  pytest tests/
+  # Run only non-VM tests
+  uv run --extra dev pytest tests/ -v -m "not vm_required"
 
-  # Run ZFS tests only
-  pytest tests/ -m zfs
+  # Run VM tests only (requires VM with testpool)
+  uv run --extra dev pytest tests/ -v -m "vm_required"
 """
 
 from __future__ import annotations
@@ -25,8 +32,11 @@ from typing import Generator
 
 import pytest
 
-# Pool name for ZFS tests (create with: zpool create testpool /path/to/file)
+# Pool name for ZFS tests
 TESTPOOL = "testpool"
+
+# Colima VM profile for ZFS testing
+VM_PROFILE = "zfs-test"
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -34,135 +44,177 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers", "zfs: mark test as requiring ZFS (deselect with '-m \"not zfs\"')"
     )
+    config.addinivalue_line(
+        "markers",
+        "vm_required: mark test as requiring Colima VM to be running",
+    )
+    config.addinivalue_line(
+        "markers", "slow: mark test as slow-running"
+    )
 
 
-def _run_zfs(args: list[str], check: bool = True) -> subprocess.CompletedProcess[str]:
-    """Run a ZFS command."""
-    return subprocess.run(
-        args,
+# =============================================================================
+# VM Helpers - Shared utilities for running commands in Colima VM
+# =============================================================================
+
+
+def vm_running() -> bool:
+    """
+    Check if the Colima VM is running.
+
+    Note: colima status outputs to stderr, not stdout.
+    """
+    result = subprocess.run(
+        ["colima", "status", "--profile", VM_PROFILE],
         capture_output=True,
         text=True,
+    )
+    combined_output = (result.stdout + result.stderr).lower()
+    return result.returncode == 0 and "is running" in combined_output
+
+
+def run_in_vm(
+    command: str, timeout: int = 30, check: bool = False
+) -> subprocess.CompletedProcess[str]:
+    """
+    Execute a command inside the Colima VM via SSH.
+
+    Args:
+        command: Shell command to run in VM
+        timeout: Command timeout in seconds
+        check: If True, raise on non-zero exit
+
+    Returns:
+        CompletedProcess with stdout, stderr, returncode
+    """
+    return subprocess.run(
+        ["colima", "ssh", "--profile", VM_PROFILE, "--", "bash", "-c", command],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
         check=check,
     )
 
 
-def _is_zfs_available() -> bool:
-    """Check if ZFS is available."""
-    result = subprocess.run(
-        ["which", "zfs"],
-        capture_output=True,
-    )
-    if result.returncode != 0:
-        return False
+def run_zfs_in_vm(
+    args: list[str], check: bool = True
+) -> subprocess.CompletedProcess[str]:
+    """
+    Run a ZFS command inside the Colima VM.
 
-    # Check if ZFS modules are loaded
-    result = _run_zfs(["zpool", "list"], check=False)
+    Args:
+        args: ZFS command and arguments (e.g., ["zfs", "list", "-H", "testpool"])
+        check: If True, raise on non-zero exit
+
+    Returns:
+        CompletedProcess with stdout, stderr, returncode
+    """
+    command = " ".join(args)
+    return run_in_vm(command, check=check)
+
+
+def pool_exists() -> bool:
+    """Check if testpool exists in the VM."""
+    result = run_in_vm(f"zpool list {TESTPOOL}")
     return result.returncode == 0
 
 
+# =============================================================================
+# Fixtures - VM availability
+# =============================================================================
+
+
 @pytest.fixture
-def zfs_dataset() -> Generator[str, None, None]:
+def ensure_vm_running() -> None:
+    """Skip test if Colima VM is not running."""
+    if not vm_running():
+        pytest.skip(
+            f"Colima VM not running. Start with: ./scripts/start-test-vm.sh"
+        )
+
+
+@pytest.fixture
+def ensure_pool_exists(ensure_vm_running: None) -> None:
+    """Skip test if testpool doesn't exist in VM."""
+    if not pool_exists():
+        pytest.skip(
+            f"Pool '{TESTPOOL}' not found. Create with: ./scripts/create-test-pool.sh"
+        )
+
+
+# =============================================================================
+# Fixtures - ZFS datasets (run in VM)
+# =============================================================================
+
+
+@pytest.fixture
+def zfs_dataset(ensure_pool_exists: None) -> Generator[str, None, None]:
     """
-    Create an isolated ZFS dataset for testing.
+    Create an isolated ZFS dataset for testing inside the Colima VM.
 
     Yields the dataset name (e.g., 'testpool/test-abc123').
     The dataset is automatically destroyed after the test.
 
-    Note: Tests using this fixture should be marked with @pytest.mark.zfs
+    Note: Tests using this fixture should be marked with @pytest.mark.vm_required
     """
-    if not _is_zfs_available():
-        pytest.skip(f"ZFS not available (requires kernel modules)")
-
-    # Check if testpool exists
-    result = _run_zfs(["zfs", "list", "-H", TESTPOOL], check=False)
-    if result.returncode != 0:
-        pytest.skip(f"ZFS pool '{TESTPOOL}' not found")
-
     # Create unique dataset name to avoid conflicts
     dataset_id = uuid.uuid4().hex[:8]
     dataset_name = f"{TESTPOOL}/test-{dataset_id}"
 
-    # Create the dataset
-    _run_zfs(["zfs", "create", dataset_name])
+    # Create the dataset in VM
+    result = run_in_vm(f"sudo zfs create {dataset_name}")
+    if result.returncode != 0:
+        pytest.fail(f"Failed to create dataset: {result.stderr}")
 
     try:
         yield dataset_name
     finally:
         # Cleanup: destroy dataset and all children
-        _run_zfs(["zfs", "destroy", "-rf", dataset_name], check=False)
+        run_in_vm(f"sudo zfs destroy -rf {dataset_name}")
 
 
 @pytest.fixture
-def zfs_dataset_with_children() -> Generator[str, None, None]:
+def zfs_dataset_with_children(
+    ensure_pool_exists: None,
+) -> Generator[str, None, None]:
     """
-    Create a ZFS dataset with child datasets for testing nested operations.
+    Create a ZFS dataset with child datasets inside the Colima VM.
 
     Yields the root dataset name. Structure:
         testpool/test-xxx/
         testpool/test-xxx/child1/
         testpool/test-xxx/child2/
 
-    Note: Tests using this fixture should be marked with @pytest.mark.zfs
+    Note: Tests using this fixture should be marked with @pytest.mark.vm_required
     """
-    if not _is_zfs_available():
-        pytest.skip(f"ZFS not available (requires kernel modules)")
-
-    # Check if testpool exists
-    result = _run_zfs(["zfs", "list", "-H", TESTPOOL], check=False)
-    if result.returncode != 0:
-        pytest.skip(f"ZFS pool '{TESTPOOL}' not found")
-
     dataset_id = uuid.uuid4().hex[:8]
     root_dataset = f"{TESTPOOL}/test-{dataset_id}"
 
-    # Create root and children
-    _run_zfs(["zfs", "create", root_dataset])
-    _run_zfs(["zfs", "create", f"{root_dataset}/child1"])
-    _run_zfs(["zfs", "create", f"{root_dataset}/child2"])
+    # Create root and children in VM
+    run_in_vm(f"sudo zfs create {root_dataset}")
+    run_in_vm(f"sudo zfs create {root_dataset}/child1")
+    run_in_vm(f"sudo zfs create {root_dataset}/child2")
 
     try:
         yield root_dataset
     finally:
-        _run_zfs(["zfs", "destroy", "-rf", root_dataset], check=False)
+        run_in_vm(f"sudo zfs destroy -rf {root_dataset}")
 
 
 @pytest.fixture
-def zfs_mountpoint(zfs_dataset: str) -> Path:
+def zfs_mountpoint(zfs_dataset: str) -> str:
     """
-    Get the mountpoint of a ZFS dataset.
+    Get the mountpoint of a ZFS dataset inside the VM.
 
-    Depends on zfs_dataset fixture.
+    Returns the mountpoint path as a string (it's inside the VM, not local).
     """
-    result = _run_zfs(
-        ["zfs", "get", "-H", "-o", "value", "mountpoint", zfs_dataset]
-    )
-    return Path(result.stdout.strip())
+    result = run_in_vm(f"zfs get -H -o value mountpoint {zfs_dataset}")
+    return result.stdout.strip()
 
 
-@pytest.fixture
-def sample_files(zfs_mountpoint: Path) -> Path:
-    """
-    Create sample files in a ZFS dataset for sync testing.
-
-    Creates:
-        file1.txt
-        subdir/file2.txt
-        symlink.txt -> file1.txt
-
-    Returns the mountpoint path.
-    """
-    # Create files
-    (zfs_mountpoint / "file1.txt").write_text("content of file 1\n")
-
-    subdir = zfs_mountpoint / "subdir"
-    subdir.mkdir()
-    (subdir / "file2.txt").write_text("content of file 2\n")
-
-    # Create symlink
-    symlink = zfs_mountpoint / "symlink.txt"
-    symlink.symlink_to("file1.txt")
-
-    return zfs_mountpoint
+# =============================================================================
+# Fixtures - Sample files (no ZFS needed)
+# =============================================================================
 
 
 @pytest.fixture
@@ -189,6 +241,11 @@ def sample_files_in_tmp(tmp_path: Path) -> Path:
     symlink.symlink_to("file1.txt")
 
     return tmp_path
+
+
+# =============================================================================
+# Fixtures - rclone
+# =============================================================================
 
 
 @pytest.fixture
