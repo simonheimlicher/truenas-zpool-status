@@ -27,12 +27,14 @@ def _run_in_vm(command: str, timeout: int = 30) -> subprocess.CompletedProcess[s
 
 def _vm_running() -> bool:
     """Check if the Colima VM is running."""
+    # Note: colima status outputs to stderr, not stdout
     result = subprocess.run(
         ["colima", "status", "--profile", "zfs-test"],
         capture_output=True,
         text=True,
     )
-    return result.returncode == 0 and "is running" in result.stdout.lower()
+    combined_output = (result.stdout + result.stderr).lower()
+    return result.returncode == 0 and "is running" in combined_output
 
 
 def _pool_exists() -> bool:

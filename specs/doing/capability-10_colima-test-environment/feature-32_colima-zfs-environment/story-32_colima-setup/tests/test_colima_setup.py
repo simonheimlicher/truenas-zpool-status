@@ -51,12 +51,14 @@ class TestColimaVMStatus:
     def test_vm_running_and_accessible(self) -> None:
         """If VM is running, we should be able to SSH into it."""
         # First check if VM is running
+        # Note: colima status outputs to stderr, not stdout
         status = subprocess.run(
             ["colima", "status", "--profile", "zfs-test"],
             capture_output=True,
             text=True,
         )
-        if status.returncode != 0 or "is running" not in status.stdout.lower():
+        combined_output = (status.stdout + status.stderr).lower()
+        if status.returncode != 0 or "is running" not in combined_output:
             pytest.skip("VM not running. Start with: ./scripts/start-test-vm.sh")
 
         # Try to execute a command in the VM
