@@ -92,6 +92,7 @@ find specs/doing -name "tests" -type d ! -exec test -f "{}/DONE.md" \; -print
 
 - [ ] **Read context/?** Read `1-structure.md` and `2-workflow.md` completely
 - [ ] **Identified current work?** Check `specs/doing/` for in-progress items
+- [ ] **Story exists?** If implementing code, verify the story exists. **NO CODE WITHOUT A STORY.** Create the story first if missing.
 - [ ] **Ran existing tests?** `uv run --extra dev pytest specs/ -v` to see current state
 - [ ] **Using uv?** NEVER use pip. Always `uv run --extra dev pytest ...`
 
@@ -213,14 +214,14 @@ return result.returncode == 0 and "is running" in combined_output
 ### Capability 10: Colima Test Environment (Foundation)
 
 **Purpose**: Enable ZFS testing on macOS via Colima VM
-**Status**: Feature-32 stories complete (32, 54, 76 have DONE.md); Feature-54, Feature-76 pending
+**Status**: ✅ COMPLETE - All features done (Feature-32, Feature-54, Feature-76 have DONE.md)
 **Why First**: Without this, we cannot run any tests that touch ZFS
 
 ### Capability 27: Dropbox Push
 
 **Purpose**: Extract `dropbox-push.py` functionality into testable `cloud-mirror.py`
 **Reference**: `dropbox-push.py` is the working implementation to be refactored
-**Status**: Specs written, implementation pending (blocked by capability-10)
+**Status**: Ready to start (unblocked by capability-10)
 
 ### Capability 54: Dropbox Mirror Pull
 
@@ -283,7 +284,11 @@ tests/
 ├── environment/             # Environment verification (graduated from capability-10)
 │   ├── test_colima.py       # Colima available and running
 │   ├── test_zfs_in_vm.py    # ZFS installed in VM
-│   └── test_pool.py         # testpool exists and healthy
+│   ├── test_pool.py         # testpool exists and healthy
+│   └── test_rclone.py       # rclone mock remote available
+├── fixtures/                # Fixture verification (graduated from capability-10)
+│   ├── test_zfs_fixtures.py # zfs_dataset, zfs_dataset_with_children
+│   └── test_sample_files.py # sample_files_in_tmp
 └── rclone-test.conf         # Mock rclone remote config
 ```
 

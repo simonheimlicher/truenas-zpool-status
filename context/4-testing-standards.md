@@ -4,6 +4,55 @@
 
 Tests describe **what the system does**, not how it does it internally.
 
+## What NOT to Test
+
+**Tests verify OUR code, not third-party tools or trivial infrastructure.**
+
+### Don't Test Third-Party Tools
+
+```python
+# ❌ BAD - testing that rclone works as documented
+def test_rclone_sync_copies_files():
+    subprocess.run(["rclone", "sync", src, dest])
+    assert dest_has_files()  # This tests rclone, not our code
+
+# ❌ BAD - testing that ZFS commands work
+def test_zfs_create_makes_dataset():
+    subprocess.run(["zfs", "create", "testpool/data"])
+    assert dataset_exists()  # This tests ZFS, not our code
+
+# ✅ GOOD - testing OUR code that uses rclone
+def test_sync_module_handles_rclone_failure():
+    with mock_rclone_failure():
+        result = our_sync_function(src, dest)
+    assert result.error == "Sync failed"
+```
+
+### Don't Test Trivial Infrastructure
+
+```python
+# ❌ BAD - trivial, if config missing the real tests fail anyway
+def test_config_file_exists():
+    assert Path("rclone-test.conf").exists()
+
+# ❌ BAD - testing fixture internals
+def test_fixture_returns_path():
+    assert test_remote.startswith("testremote:")
+
+# ✅ GOOD - one smoke test that fails loudly and points fingers
+def test_rclone_mock_remote_available():
+    """Verify rclone infrastructure ready for Capability-27."""
+    result = subprocess.run(["rclone", "--config", config, "listremotes"], ...)
+    assert "testremote:" in result.stdout, (
+        "rclone mock remote not available. "
+        "See Feature-76 (mock-rclone-remote)."  # Points to responsible feature
+    )
+```
+
+### Smoke Tests Should Point Fingers
+
+When infrastructure fails, the error message must identify the responsible feature/capability so agents don't waste time debugging the wrong thing.
+
 ```python
 # Good - tests behavior
 def test_filter_returns_only_missing_movies():
