@@ -10,6 +10,7 @@ dependencies = []
 dev = [
     "pytest>=8.0",
     "pytest-cov>=4.0",
+    "python-dotenv>=1.0",
 ]
 
 [tool.pytest.ini_options]
@@ -17,6 +18,7 @@ testpaths = ["tests", "specs"]
 markers = [
     "zfs: mark test as requiring ZFS (deselect with '-m \"not zfs\"')",
     "vm_required: mark test as requiring Colima VM to be running",
+    "internet_required: mark test as requiring internet and DROPBOX_TEST_TOKEN",
     "slow: mark test as slow-running",
 ]
 

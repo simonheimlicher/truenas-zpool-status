@@ -3,3 +3,8 @@ __pycache__
 .coverage
 .semgrep/
 
+# Secrets - never commit
+.env
+*.env.local
+tests/rclone-dropbox.conf
+

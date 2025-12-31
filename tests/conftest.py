@@ -11,6 +11,7 @@ Tests are dev-only infrastructure and never run in production.
 Test Categories:
 - Unit tests: Run anywhere (no ZFS needed) - direction detection, validation
 - VM tests: Require Colima VM running with ZFS installed
+- Internet tests: Require DROPBOX_TEST_TOKEN for real Dropbox (Level 3)
 
 Usage:
   # Run all tests (some may skip if VM not running)
@@ -21,16 +22,27 @@ Usage:
 
   # Run VM tests only (requires VM with testpool)
   uv run --extra dev pytest tests/ -v -m "vm_required"
+
+  # Run Dropbox tests (requires DROPBOX_TEST_TOKEN in .env)
+  uv run --extra dev pytest tests/ -v -m "internet_required"
 """
 
 from __future__ import annotations
 
+import os
 import subprocess
 import uuid
 from pathlib import Path
 from typing import Generator
 
 import pytest
+
+# Load .env file if python-dotenv is available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not installed, rely on environment variables
 
 # Pool name for ZFS tests
 TESTPOOL = "testpool"
@@ -50,6 +62,10 @@ def pytest_configure(config: pytest.Config) -> None:
     )
     config.addinivalue_line(
         "markers", "slow: mark test as slow-running"
+    )
+    config.addinivalue_line(
+        "markers",
+        "internet_required: mark test as requiring internet and DROPBOX_TEST_TOKEN",
     )
 
 
@@ -268,3 +284,81 @@ def rclone_config() -> Path:
     if not config_path.exists():
         pytest.skip("rclone-test.conf not found")
     return config_path
+
+
+# =============================================================================
+# Fixtures - Dropbox (Level 3 - Internet Required)
+# =============================================================================
+
+
+def get_dropbox_token() -> str | None:
+    """Get Dropbox test token from environment."""
+    return os.environ.get("DROPBOX_TEST_TOKEN")
+
+
+@pytest.fixture
+def dropbox_token() -> str:
+    """
+    Get Dropbox test token, skip if not available.
+
+    The token should be set in .env file or DROPBOX_TEST_TOKEN environment variable.
+    Get it by running: rclone authorize "dropbox"
+    """
+    token = get_dropbox_token()
+    if not token:
+        pytest.skip(
+            "DROPBOX_TEST_TOKEN not set. "
+            "Run 'rclone authorize dropbox' and add token to .env file."
+        )
+    return token
+
+
+@pytest.fixture
+def dropbox_config(tmp_path: Path, dropbox_token: str) -> Path:
+    """
+    Create temporary rclone config with real Dropbox credentials.
+
+    Returns path to the config file.
+    """
+    config_path = tmp_path / "rclone-dropbox.conf"
+    config_path.write_text(f"""[dropbox-test]
+type = dropbox
+token = {dropbox_token}
+""")
+    return config_path
+
+
+@pytest.fixture
+def dropbox_test_folder(
+    dropbox_config: Path,
+) -> Generator[str, None, None]:
+    """
+    Create an isolated test folder on Dropbox.
+
+    Yields the rclone remote path (e.g., 'dropbox-test:cloud-mirror-test/test_abc123').
+    The folder is automatically deleted after the test.
+
+    Note: Tests using this fixture should be marked with @pytest.mark.internet_required
+    """
+    folder_id = uuid.uuid4().hex[:8]
+    remote_path = f"dropbox-test:cloud-mirror-test/test_{folder_id}"
+
+    # Create the test folder
+    result = subprocess.run(
+        ["rclone", "mkdir", remote_path, "--config", str(dropbox_config)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        pytest.fail(f"Failed to create Dropbox test folder: {result.stderr}")
+
+    try:
+        yield remote_path
+    finally:
+        # Cleanup: delete test folder and all contents
+        subprocess.run(
+            ["rclone", "purge", remote_path, "--config", str(dropbox_config)],
+            capture_output=True,
+            timeout=60,
+        )
