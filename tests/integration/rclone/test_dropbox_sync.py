@@ -23,7 +23,9 @@ import pytest
 from cloud_mirror.rclone import (
     RcloneSyncConfig,
     RcloneSyncError,
+    cleanup_old_versions,
     run_rclone_sync,
+    VERSIONS_DIR,
 )
 
 
@@ -330,3 +332,123 @@ class TestDropboxIdempotency:
         assert (
             result2.files_transferred == 0
         ), f"Expected 0 files, got {result2.files_transferred}"
+
+
+# =============================================================================
+# Part 5: Version Backup on Real Dropbox (FR1, FR2, FR3)
+# =============================================================================
+
+
+def _run_rclone_mkdir(
+    rclone_bin: str, remote: str, config: Path, timeout: int = 30
+) -> subprocess.CompletedProcess[str]:
+    """Create directory on remote."""
+    return subprocess.run(  # noqa: S603 - test helper with controlled inputs
+        [rclone_bin, "mkdir", remote, "--config", str(config)],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
+def _run_rclone_copy(
+    rclone_bin: str, source: str, dest: str, config: Path, timeout: int = 30
+) -> subprocess.CompletedProcess[str]:
+    """Copy file to remote."""
+    return subprocess.run(  # noqa: S603 - test helper with controlled inputs
+        [rclone_bin, "copy", source, dest, "--config", str(config)],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
+@pytest.mark.internet_required
+class TestDropboxVersionBackup:
+    """GIVEN real Dropbox version backup. Level 3 tests per ADR-001."""
+
+    def test_version_backup_works_on_dropbox(
+        self,
+        source_dir: Path,
+        dropbox_test_folder: str,
+        dropbox_config: Path,
+        rclone_bin: str,
+    ) -> None:
+        """FR1/FR2 at Level 3: Verify --backup-dir works with Dropbox."""
+        # Arrange - create initial file on Dropbox
+        initial_file = source_dir / "initial.txt"
+        initial_file.write_text("initial content\n")
+
+        # First sync to establish the file
+        config1 = RcloneSyncConfig(
+            source=source_dir,
+            destination=dropbox_test_folder,
+            config_path=dropbox_config,
+            tpslimit=8,
+        )
+        result1 = run_rclone_sync(config1, rclone_bin=rclone_bin, timeout=120)
+        assert result1.success
+
+        # Modify the file
+        initial_file.write_text("modified content\n")
+
+        # Second sync with versioning
+        timestamp = "2025-01-15T12-00-00Z"
+        config2 = RcloneSyncConfig(
+            source=source_dir,
+            destination=dropbox_test_folder,
+            config_path=dropbox_config,
+            keep_versions=3,
+            timestamp=timestamp,
+            tpslimit=8,
+        )
+        result2 = run_rclone_sync(config2, rclone_bin=rclone_bin, timeout=120)
+
+        # Assert
+        assert result2.success
+
+        # Verify backup exists on Dropbox
+        backup_path = f"{dropbox_test_folder}/{VERSIONS_DIR}/{timestamp}"
+        verify = _run_rclone_verify(rclone_bin, "ls", backup_path, dropbox_config)
+        assert "initial.txt" in verify.stdout, f"Backup not found: {verify.stdout}"
+
+    def test_cleanup_works_on_dropbox(
+        self,
+        dropbox_test_folder: str,
+        dropbox_config: Path,
+        rclone_bin: str,
+    ) -> None:
+        """FR3 at Level 3: Verify cleanup_old_versions works with Dropbox."""
+        # Arrange - create 4 version directories on Dropbox
+        timestamps = [
+            "2025-01-10T00-00-00Z",
+            "2025-01-11T00-00-00Z",
+            "2025-01-12T00-00-00Z",
+            "2025-01-13T00-00-00Z",
+        ]
+
+        for ts in timestamps:
+            version_path = f"{dropbox_test_folder}/{VERSIONS_DIR}/{ts}"
+            _run_rclone_mkdir(rclone_bin, version_path, dropbox_config)
+
+        # Act - cleanup, keep only 2
+        result = cleanup_old_versions(
+            destination=dropbox_test_folder,
+            config_path=dropbox_config,
+            keep_versions=2,
+            rclone_bin=rclone_bin,
+            timeout=120,
+        )
+
+        # Assert
+        assert result.success
+        assert result.deleted_count == 2
+        assert result.remaining_count == 2
+
+        # Verify only newest 2 remain
+        versions_path = f"{dropbox_test_folder}/{VERSIONS_DIR}"
+        verify = _run_rclone_verify(rclone_bin, "lsd", versions_path, dropbox_config)
+        assert "2025-01-10T00-00-00Z" not in verify.stdout
+        assert "2025-01-11T00-00-00Z" not in verify.stdout
+        assert "2025-01-12T00-00-00Z" in verify.stdout
+        assert "2025-01-13T00-00-00Z" in verify.stdout

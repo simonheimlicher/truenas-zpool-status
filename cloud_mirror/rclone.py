@@ -577,3 +577,225 @@ def _get_error_suggestion(error: RcloneError | None) -> str:
     }
 
     return suggestions.get(error.category, "Check rclone logs for details.")
+
+
+# =============================================================================
+# Version Cleanup (Level 2/3 - Integration)
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class CleanupResult:
+    """Result of version cleanup operation.
+
+    Attributes:
+        success: True if cleanup completed without errors.
+        deleted_count: Number of version directories deleted.
+        remaining_count: Number of version directories remaining.
+        deleted_versions: List of deleted version timestamps.
+        errors: List of errors encountered during cleanup.
+    """
+
+    success: bool
+    deleted_count: int = 0
+    remaining_count: int = 0
+    deleted_versions: list[str] = field(default_factory=list)
+    errors: list[RcloneError] = field(default_factory=list)
+
+
+def list_version_directories(
+    destination: str,
+    config_path: Path,
+    rclone_bin: str = RCLONE_BIN,
+    timeout: int = 60,
+) -> list[str]:
+    """List version directories in the .versions folder.
+
+    Uses rclone lsd to list directories in the versions folder.
+    Directories are expected to be ISO 8601 timestamps with dashes replacing colons.
+
+    Args:
+        destination: rclone destination (e.g., "dropbox:backup").
+        config_path: Path to rclone configuration file.
+        rclone_bin: Path to rclone binary (injectable for testing).
+        timeout: Timeout in seconds for the operation.
+
+    Returns:
+        List of version directory names, sorted oldest first.
+
+    Raises:
+        RcloneSyncError: If listing fails.
+    """
+    versions_path = f"{destination}/{VERSIONS_DIR}"
+
+    cmd = [
+        rclone_bin,
+        "--config", str(config_path),
+        "lsd",
+        versions_path,
+    ]
+
+    try:
+        result = subprocess.run(  # noqa: S603 - cmd is built from controlled inputs
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as e:
+        raise RcloneSyncError(
+            message=f"Listing versions timed out after {timeout} seconds",
+            suggestion="Check network connectivity.",
+            returncode=-1,
+        ) from e
+    except FileNotFoundError as e:
+        raise RcloneSyncError(
+            message=f"rclone binary not found: {rclone_bin}",
+            suggestion="Install rclone or provide correct path via rclone_bin parameter.",
+            returncode=-1,
+        ) from e
+
+    # If versions directory doesn't exist, return empty list (not an error)
+    if result.returncode != 0:
+        if "directory not found" in result.stderr.lower() or "not found" in result.stderr.lower():
+            return []
+        # Other errors are real failures
+        raise RcloneSyncError(
+            message=f"Failed to list versions: {result.stderr}",
+            suggestion="Check that the destination is accessible.",
+            returncode=result.returncode,
+        )
+
+    # Parse lsd output - format is like: "          -1 2025-01-10T00-00-00Z"
+    versions = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # lsd output has size (-1 for dirs) then name
+        parts = line.split()
+        if len(parts) >= 2:
+            dir_name = parts[-1]  # Last part is directory name
+            versions.append(dir_name)
+
+    # Sort chronologically (oldest first)
+    # ISO 8601 format sorts correctly as strings
+    versions.sort()
+    return versions
+
+
+def cleanup_old_versions(
+    destination: str,
+    config_path: Path,
+    keep_versions: int,
+    rclone_bin: str = RCLONE_BIN,
+    timeout: int = 120,
+    logger: logging.Logger | None = None,
+) -> CleanupResult:
+    """Clean up old version directories, keeping only the N most recent.
+
+    Lists version directories in .versions/, sorts by timestamp, and
+    deletes all but the most recent `keep_versions` directories.
+
+    Args:
+        destination: rclone destination (e.g., "dropbox:backup").
+        config_path: Path to rclone configuration file.
+        keep_versions: Number of versions to keep.
+        rclone_bin: Path to rclone binary (injectable for testing).
+        timeout: Timeout in seconds for cleanup operations.
+        logger: Logger for diagnostics (uses module logger if not provided).
+
+    Returns:
+        CleanupResult with success status and cleanup statistics.
+
+    Raises:
+        RcloneSyncError: If cleanup fails critically.
+
+    Examples:
+        >>> result = cleanup_old_versions(
+        ...     destination="dropbox:backup",
+        ...     config_path=Path("~/.config/rclone/rclone.conf"),
+        ...     keep_versions=3,
+        ... )
+        >>> print(f"Deleted {result.deleted_count} old versions")
+    """
+    log = logger or _logger
+
+    if keep_versions < 1:
+        return CleanupResult(
+            success=True,
+            deleted_count=0,
+            remaining_count=0,
+            errors=[],
+        )
+
+    # List current versions
+    versions = list_version_directories(destination, config_path, rclone_bin, timeout)
+    log.debug(f"Found {len(versions)} version directories")
+
+    # FR4: Skip cleanup if not enough versions
+    if len(versions) <= keep_versions:
+        log.debug(f"Only {len(versions)} versions exist, keeping all (keep_versions={keep_versions})")
+        return CleanupResult(
+            success=True,
+            deleted_count=0,
+            remaining_count=len(versions),
+            errors=[],
+        )
+
+    # Determine which to delete (oldest first, keep newest)
+    versions_to_delete = versions[:-keep_versions]
+    log.info(f"Deleting {len(versions_to_delete)} old versions, keeping {keep_versions}")
+
+    deleted = []
+    errors = []
+
+    for version in versions_to_delete:
+        version_path = f"{destination}/{VERSIONS_DIR}/{version}"
+        log.debug(f"Deleting version: {version}")
+
+        cmd = [
+            rclone_bin,
+            "--config", str(config_path),
+            "purge",
+            version_path,
+        ]
+
+        try:
+            result = subprocess.run(  # noqa: S603 - cmd is built from controlled inputs
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+
+            if result.returncode == 0:
+                deleted.append(version)
+            else:
+                error = RcloneError(
+                    category="transfer_error",
+                    message=f"Failed to delete version {version}: {result.stderr}",
+                    file=version_path,
+                    raw=result.stderr,
+                )
+                errors.append(error)
+                log.warning(f"Failed to delete version {version}: {result.stderr}")
+
+        except subprocess.TimeoutExpired:
+            error = RcloneError(
+                category="network_error",
+                message=f"Timeout deleting version {version}",
+                file=version_path,
+            )
+            errors.append(error)
+            log.warning(f"Timeout deleting version {version}")
+
+    remaining = len(versions) - len(deleted)
+
+    return CleanupResult(
+        success=len(errors) == 0,
+        deleted_count=len(deleted),
+        remaining_count=remaining,
+        deleted_versions=deleted,
+        errors=errors,
+    )
