@@ -85,6 +85,48 @@ class RcloneSyncConfig:
     timestamp: str = ""
 
 
+def get_versions_base_path(destination: str) -> str:
+    """Get the base path for version storage (sibling to destination).
+
+    The .versions directory is placed as a sibling to the destination,
+    not inside it. This avoids rclone's restriction that --backup-dir
+    cannot overlap with the destination.
+
+    Args:
+        destination: rclone destination (e.g., "dropbox:backup/data").
+
+    Returns:
+        Base path for versions (e.g., "dropbox:backup/.versions/data").
+
+    Examples:
+        >>> get_versions_base_path("dropbox:backup/data")
+        'dropbox:backup/.versions/data'
+        >>> get_versions_base_path("dropbox:mydata")
+        'dropbox:.versions/mydata'
+        >>> get_versions_base_path("remote:a/b/c")
+        'remote:a/b/.versions/c'
+    """
+    # Split remote:path
+    if ":" in destination:
+        remote, path = destination.split(":", 1)
+    else:
+        # Local path (shouldn't happen in production but handle it)
+        remote = ""
+        path = destination
+
+    # Split path into parent and name
+    if "/" in path:
+        parent, name = path.rsplit("/", 1)
+        versions_base = f"{parent}/{VERSIONS_DIR}/{name}"
+    else:
+        # Root level - .versions at root with destination name as subfolder
+        versions_base = f"{VERSIONS_DIR}/{path}"
+
+    if remote:
+        return f"{remote}:{versions_base}"
+    return versions_base
+
+
 def build_rclone_command(
     config: RcloneSyncConfig,
     rclone_bin: str = RCLONE_BIN,
@@ -118,8 +160,9 @@ def build_rclone_command(
     ]
 
     # Add backup-dir for versioning if enabled
+    # Uses sibling .versions path to avoid overlap with destination
     if config.keep_versions > 0 and config.timestamp:
-        backup_dir = f"{config.destination}/{VERSIONS_DIR}/{config.timestamp}"
+        backup_dir = get_version_backup_path(config.destination, config.timestamp)
         cmd.extend(["--backup-dir", backup_dir])
 
     if config.dry_run:
@@ -134,14 +177,22 @@ def build_rclone_command(
 def get_version_backup_path(destination: str, timestamp: str) -> str:
     """Get the backup directory path for versioning.
 
+    The backup path is a sibling to the destination, not inside it.
+    This avoids rclone's restriction that --backup-dir cannot overlap
+    with the destination.
+
     Args:
-        destination: rclone destination (e.g., "dropbox:backup").
+        destination: rclone destination (e.g., "dropbox:backup/data").
         timestamp: Timestamp string for version directory.
 
     Returns:
         Full path to backup directory.
+
+    Examples:
+        >>> get_version_backup_path("dropbox:backup/data", "2025-01-15T12-00-00Z")
+        'dropbox:backup/.versions/data/2025-01-15T12-00-00Z'
     """
-    return f"{destination}/{VERSIONS_DIR}/{timestamp}"
+    return f"{get_versions_base_path(destination)}/{timestamp}"
 
 
 def parse_rclone_error(line: str) -> RcloneError | None:
@@ -626,7 +677,7 @@ def list_version_directories(
     Raises:
         RcloneSyncError: If listing fails.
     """
-    versions_path = f"{destination}/{VERSIONS_DIR}"
+    versions_path = get_versions_base_path(destination)
 
     cmd = [
         rclone_bin,
@@ -751,7 +802,7 @@ def cleanup_old_versions(
     errors = []
 
     for version in versions_to_delete:
-        version_path = f"{destination}/{VERSIONS_DIR}/{version}"
+        version_path = f"{get_versions_base_path(destination)}/{version}"
         log.debug(f"Deleting version: {version}")
 
         cmd = [

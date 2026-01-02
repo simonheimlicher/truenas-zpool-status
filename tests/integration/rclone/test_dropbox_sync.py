@@ -24,6 +24,7 @@ from cloud_mirror.rclone import (
     RcloneSyncConfig,
     RcloneSyncError,
     cleanup_old_versions,
+    get_versions_base_path,
     run_rclone_sync,
     VERSIONS_DIR,
 )
@@ -407,8 +408,8 @@ class TestDropboxVersionBackup:
         # Assert
         assert result2.success
 
-        # Verify backup exists on Dropbox
-        backup_path = f"{dropbox_test_folder}/{VERSIONS_DIR}/{timestamp}"
+        # Verify backup exists on Dropbox (sibling path structure)
+        backup_path = f"{get_versions_base_path(dropbox_test_folder)}/{timestamp}"
         verify = _run_rclone_verify(rclone_bin, "ls", backup_path, dropbox_config)
         assert "initial.txt" in verify.stdout, f"Backup not found: {verify.stdout}"
 
@@ -419,7 +420,7 @@ class TestDropboxVersionBackup:
         rclone_bin: str,
     ) -> None:
         """FR3 at Level 3: Verify cleanup_old_versions works with Dropbox."""
-        # Arrange - create 4 version directories on Dropbox
+        # Arrange - create 4 version directories on Dropbox (sibling path structure)
         timestamps = [
             "2025-01-10T00-00-00Z",
             "2025-01-11T00-00-00Z",
@@ -427,8 +428,9 @@ class TestDropboxVersionBackup:
             "2025-01-13T00-00-00Z",
         ]
 
+        versions_base = get_versions_base_path(dropbox_test_folder)
         for ts in timestamps:
-            version_path = f"{dropbox_test_folder}/{VERSIONS_DIR}/{ts}"
+            version_path = f"{versions_base}/{ts}"
             _run_rclone_mkdir(rclone_bin, version_path, dropbox_config)
 
         # Act - cleanup, keep only 2
@@ -445,9 +447,8 @@ class TestDropboxVersionBackup:
         assert result.deleted_count == 2
         assert result.remaining_count == 2
 
-        # Verify only newest 2 remain
-        versions_path = f"{dropbox_test_folder}/{VERSIONS_DIR}"
-        verify = _run_rclone_verify(rclone_bin, "lsd", versions_path, dropbox_config)
+        # Verify only newest 2 remain (sibling path structure)
+        verify = _run_rclone_verify(rclone_bin, "lsd", versions_base, dropbox_config)
         assert "2025-01-10T00-00-00Z" not in verify.stdout
         assert "2025-01-11T00-00-00Z" not in verify.stdout
         assert "2025-01-12T00-00-00Z" in verify.stdout

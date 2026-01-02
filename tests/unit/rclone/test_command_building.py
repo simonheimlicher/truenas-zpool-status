@@ -92,7 +92,8 @@ COMMAND_TYPICAL: dict[str, CommandTestCase] = {
         ),
         expected_contains=[
             "--backup-dir",
-            "dropbox:backup/.versions/2025-01-15T03-15-00Z",
+            # Sibling path: .versions is placed alongside destination, not inside
+            "dropbox:.versions/backup/2025-01-15T03-15-00Z",
         ],
     ),
     "DRY_RUN": CommandTestCase(
@@ -520,19 +521,25 @@ class TestSystematicCoverage:
 
 
 class TestGetVersionBackupPath:
-    """Tests for get_version_backup_path function."""
+    """Tests for get_version_backup_path function.
+
+    The version backup path is a SIBLING to the destination, not inside it.
+    This avoids rclone's restriction that --backup-dir cannot overlap with destination.
+    """
 
     def test_constructs_path_correctly(self) -> None:
-        """GIVEN destination and timestamp WHEN called THEN returns correct path."""
+        """GIVEN destination and timestamp WHEN called THEN returns sibling path."""
         result = get_version_backup_path("dropbox:backup", "2025-01-15T03-15-00Z")
 
-        assert result == "dropbox:backup/.versions/2025-01-15T03-15-00Z"
+        # .versions is at root level, with destination name as subfolder
+        assert result == "dropbox:.versions/backup/2025-01-15T03-15-00Z"
 
     def test_works_with_nested_destination(self) -> None:
-        """GIVEN nested destination WHEN called THEN returns correct path."""
+        """GIVEN nested destination WHEN called THEN returns sibling path."""
         result = get_version_backup_path("dropbox:my/nested/backup", "2025-01-15T03-15-00Z")
 
-        assert result == "dropbox:my/nested/backup/.versions/2025-01-15T03-15-00Z"
+        # .versions is placed alongside "backup", not inside it
+        assert result == "dropbox:my/nested/.versions/backup/2025-01-15T03-15-00Z"
 
 
 class TestFilterRcloneOutput:

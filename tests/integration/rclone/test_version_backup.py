@@ -71,15 +71,25 @@ def create_file(path: Path, content: str) -> None:
     path.write_text(content)
 
 
-def create_version_dirs(dest: Path, timestamps: list[str]) -> None:
-    """Create version directories manually for testing cleanup."""
-    versions_dir = dest / VERSIONS_DIR
-    versions_dir.mkdir(parents=True, exist_ok=True)
+def create_version_dirs(dest: Path, timestamps: list[str]) -> Path:
+    """Create version directories at sibling location for testing cleanup.
+
+    The .versions directory is placed as a sibling to the destination,
+    not inside it. This matches the production path structure.
+
+    For dest=/tmp/xyz/dest, versions are at /tmp/xyz/.versions/dest/
+
+    Returns the versions base directory for verification.
+    """
+    # Sibling structure: parent/.versions/dest_name/
+    versions_base = dest.parent / VERSIONS_DIR / dest.name
+    versions_base.mkdir(parents=True, exist_ok=True)
     for ts in timestamps:
-        version_dir = versions_dir / ts
+        version_dir = versions_base / ts
         version_dir.mkdir()
         # Add a dummy file to make it a non-empty directory
         (version_dir / "dummy.txt").write_text("version content")
+    return versions_base
 
 
 # =============================================================================
@@ -199,7 +209,7 @@ class TestVersionCleanup:
             "2025-01-13T00-00-00Z",
             "2025-01-14T00-00-00Z",
         ]
-        create_version_dirs(dest_dir, timestamps)
+        versions_base = create_version_dirs(dest_dir, timestamps)
 
         # Act
         result = cleanup_old_versions(
@@ -214,15 +224,14 @@ class TestVersionCleanup:
         assert result.deleted_count == 2
         assert result.remaining_count == 3
 
-        # Oldest 2 should be deleted
-        versions_dir = dest_dir / VERSIONS_DIR
-        assert not (versions_dir / "2025-01-10T00-00-00Z").exists()
-        assert not (versions_dir / "2025-01-11T00-00-00Z").exists()
+        # Oldest 2 should be deleted (sibling location)
+        assert not (versions_base / "2025-01-10T00-00-00Z").exists()
+        assert not (versions_base / "2025-01-11T00-00-00Z").exists()
 
         # Newest 3 should remain
-        assert (versions_dir / "2025-01-12T00-00-00Z").exists()
-        assert (versions_dir / "2025-01-13T00-00-00Z").exists()
-        assert (versions_dir / "2025-01-14T00-00-00Z").exists()
+        assert (versions_base / "2025-01-12T00-00-00Z").exists()
+        assert (versions_base / "2025-01-13T00-00-00Z").exists()
+        assert (versions_base / "2025-01-14T00-00-00Z").exists()
 
     def test_cleanup_skips_when_not_enough_versions(
         self,
@@ -236,7 +245,7 @@ class TestVersionCleanup:
             "2025-01-10T00-00-00Z",
             "2025-01-11T00-00-00Z",
         ]
-        create_version_dirs(dest_dir, timestamps)
+        versions_base = create_version_dirs(dest_dir, timestamps)
 
         # Act
         result = cleanup_old_versions(
@@ -251,10 +260,9 @@ class TestVersionCleanup:
         assert result.deleted_count == 0
         assert result.remaining_count == 2
 
-        # Both should still exist
-        versions_dir = dest_dir / VERSIONS_DIR
-        assert (versions_dir / "2025-01-10T00-00-00Z").exists()
-        assert (versions_dir / "2025-01-11T00-00-00Z").exists()
+        # Both should still exist (sibling location)
+        assert (versions_base / "2025-01-10T00-00-00Z").exists()
+        assert (versions_base / "2025-01-11T00-00-00Z").exists()
 
     def test_cleanup_handles_no_versions_directory(
         self,
