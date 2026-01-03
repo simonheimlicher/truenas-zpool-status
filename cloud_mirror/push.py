@@ -18,11 +18,17 @@ Workflow steps:
 
 from __future__ import annotations
 
+import fcntl
 import logging
+import os
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Generator, Protocol
+
+if TYPE_CHECKING:
+    from typing import IO
 
 # =============================================================================
 # Exceptions
@@ -47,6 +53,137 @@ class CloneError(PushError):
 
 class SyncError(PushError):
     """Rclone sync failed."""
+
+
+class LockError(PushError):
+    """Could not acquire lock (concurrent operation)."""
+
+    def __init__(self, pool: str, lock_path: Path) -> None:
+        """Initialize LockError with pool name and lock file path.
+
+        Args:
+            pool: Name of the ZFS pool that is locked.
+            lock_path: Path to the lock file.
+        """
+        super().__init__(
+            f"Could not acquire lock for pool '{pool}': "
+            f"another operation may be in progress. Lock file: {lock_path}"
+        )
+        self.pool = pool
+        self.lock_path = lock_path
+
+
+# =============================================================================
+# Locking
+# =============================================================================
+
+
+def get_lock_directory() -> Path:
+    """Get the directory for lock files.
+
+    Returns the lock directory following XDG conventions:
+    1. $XDG_RUNTIME_DIR/cloud-mirror if XDG_RUNTIME_DIR is set
+    2. /var/run/cloud-mirror if it exists and is writable
+    3. ~/.cache/cloud-mirror as fallback
+
+    Returns:
+        Path to the lock directory (created if necessary).
+    """
+    # Try XDG_RUNTIME_DIR first (e.g., /run/user/1000 on Linux)
+    xdg_runtime = os.environ.get("XDG_RUNTIME_DIR")
+    if xdg_runtime:
+        lock_dir = Path(xdg_runtime) / "cloud-mirror"
+        try:
+            lock_dir.mkdir(parents=True, exist_ok=True)
+            return lock_dir
+        except OSError:
+            pass  # Fall through to next option
+
+    # Try /var/run/cloud-mirror (system-wide, requires privileges)
+    var_run = Path("/var/run/cloud-mirror")
+    try:
+        var_run.mkdir(parents=True, exist_ok=True)
+        return var_run
+    except OSError:
+        pass  # Fall through to user cache
+
+    # Fallback to user cache directory
+    cache_dir = Path.home() / ".cache" / "cloud-mirror"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+
+
+def extract_pool_name(dataset: str) -> str:
+    """Extract the pool name from a dataset path.
+
+    Args:
+        dataset: Dataset name (e.g., "testpool/data/subdir").
+
+    Returns:
+        Pool name (e.g., "testpool").
+    """
+    return dataset.split("/")[0]
+
+
+@contextmanager
+def pool_lock(
+    dataset: str,
+    lock_dir: Path | None = None,
+) -> Generator[Path, None, None]:
+    """Context manager for acquiring an exclusive lock on a ZFS pool.
+
+    Acquires a non-blocking exclusive lock using fcntl.flock(LOCK_EX | LOCK_NB).
+    The lock is per-pool (not per-dataset) to prevent conflicting operations.
+
+    Args:
+        dataset: Dataset name to extract pool from (e.g., "testpool/data").
+        lock_dir: Optional lock directory override (for testing).
+
+    Yields:
+        Path to the lock file.
+
+    Raises:
+        LockError: If lock cannot be acquired (another operation in progress).
+
+    Example:
+        with pool_lock("testpool/data") as lock_path:
+            # Exclusive access to testpool
+            run_sync()
+        # Lock automatically released
+    """
+    pool = extract_pool_name(dataset)
+    lock_directory = lock_dir or get_lock_directory()
+    lock_path = lock_directory / f"{pool}.lock"
+
+    # Ensure lock directory exists
+    lock_directory.mkdir(parents=True, exist_ok=True)
+
+    # Open lock file (create if doesn't exist)
+    lock_file: IO[str] | None = None
+    try:
+        lock_file = lock_path.open("w")
+
+        # Try to acquire exclusive lock (non-blocking)
+        try:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as err:
+            # Lock is held by another process
+            raise LockError(pool, lock_path) from err
+
+        # Write PID to lock file for debugging
+        lock_file.write(f"{os.getpid()}\n")
+        lock_file.flush()
+
+        yield lock_path
+
+    finally:
+        if lock_file is not None:
+            # Release lock and close file
+            try:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass  # Ignore errors during unlock
+            lock_file.close()
 
 
 # =============================================================================
