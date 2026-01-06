@@ -516,3 +516,409 @@ class PushOrchestrator:
             clone_path=clone_path if config.keep_clone else None,
             versions_deleted=versions_deleted,
         )
+
+
+# =============================================================================
+# Real Operations Implementation
+# =============================================================================
+
+
+class RealPushOperations:
+    """Real implementation of PushOperations using ZFS and rclone.
+
+    This class wraps the actual ZFS and rclone operations from zfs.py
+    and rclone.py modules, providing the concrete implementation for
+    the PushOperations protocol.
+    """
+
+    def __init__(self, logger: logging.Logger) -> None:
+        """Initialize with logger.
+
+        Args:
+            logger: Logger for operation diagnostics.
+        """
+        self._logger = logger
+        self._altroot: Path | None = None  # Cached pool altroot
+
+    def validate_dataset(self, dataset: str) -> None:
+        """Validate that a ZFS dataset exists.
+
+        Args:
+            dataset: Dataset name to validate.
+
+        Raises:
+            ValidationError: If dataset does not exist.
+        """
+        from cloud_mirror.zfs import ZfsError, run_zfs_command
+
+        try:
+            run_zfs_command(["zfs", "list", "-H", dataset], self._logger)
+        except ZfsError as e:
+            raise ValidationError(f"Dataset '{dataset}' does not exist: {e}") from e
+
+    def validate_remote(self, remote: str, config_path: Path) -> None:
+        """Validate rclone remote configuration.
+
+        Args:
+            remote: Remote destination (e.g., "dropbox:backup").
+            config_path: Path to rclone configuration file.
+
+        Raises:
+            ValidationError: If remote is not configured or invalid.
+        """
+        import shutil
+        import subprocess
+
+        # Extract remote name from "remotename:path"
+        remote_name = remote.split(":")[0]
+
+        # Find rclone binary
+        rclone_bin = shutil.which("rclone") or "/usr/bin/rclone"
+
+        try:
+            result = subprocess.run(  # noqa: S603, S607
+                [rclone_bin, "--config", str(config_path), "listremotes"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode != 0:
+                raise ValidationError(
+                    f"Failed to list rclone remotes: {result.stderr}"
+                )
+
+            remotes = [r.rstrip(":") for r in result.stdout.strip().split("\n") if r]
+            if remote_name not in remotes:
+                raise ValidationError(
+                    f"Remote '{remote_name}' not found in rclone config. "
+                    f"Available remotes: {', '.join(remotes)}"
+                )
+        except subprocess.TimeoutExpired as e:
+            raise ValidationError(f"Timeout validating rclone remote: {e}") from e
+        except FileNotFoundError as e:
+            raise ValidationError(f"rclone not found: {e}") from e
+
+    def list_datasets(self, root_dataset: str) -> list[str]:
+        """List all datasets under and including the root dataset.
+
+        Args:
+            root_dataset: Root dataset name.
+
+        Returns:
+            List of dataset names, sorted (parent before children).
+        """
+        from cloud_mirror.zfs import list_datasets_recursive
+
+        return list_datasets_recursive(root_dataset, self._logger)
+
+    def create_snapshot(self, root_dataset: str, snapshot_name: str) -> None:
+        """Create a recursive ZFS snapshot.
+
+        Args:
+            root_dataset: Root dataset name.
+            snapshot_name: Name for the snapshot (without @).
+
+        Raises:
+            SnapshotError: If snapshot creation fails.
+        """
+        from cloud_mirror.zfs import ZfsError, create_recursive_snapshot
+
+        try:
+            create_recursive_snapshot(root_dataset, snapshot_name, self._logger)
+        except ZfsError as e:
+            raise SnapshotError(f"Failed to create snapshot: {e}") from e
+
+    def create_clone_tree(
+        self,
+        root_dataset: str,
+        datasets: list[str],
+        snapshot_name: str,
+    ) -> Path:
+        """Create clone tree from snapshot.
+
+        Args:
+            root_dataset: Root dataset name.
+            datasets: List of all datasets to clone.
+            snapshot_name: Name of the snapshot to clone from.
+
+        Returns:
+            Path to the mounted clone tree root.
+
+        Raises:
+            CloneError: If clone creation fails.
+        """
+        from cloud_mirror.zfs import (
+            ZfsError,
+            create_clone_tree,
+            destroy_clone_tree,
+            find_stale_clone,
+            get_clone_dataset_name,
+            get_clone_mountpoint,
+            get_pool_altroot,
+            get_pool_name,
+            run_zfs_command,
+        )
+
+        # Get source mountpoint
+        result = run_zfs_command(
+            ["zfs", "get", "-H", "-o", "value", "mountpoint", root_dataset],
+            self._logger,
+        )
+        source_mountpoint = Path(result.stdout.strip())
+
+        # Derive clone names
+        clone_root = get_clone_dataset_name(root_dataset)
+        clone_mountpoint = get_clone_mountpoint(source_mountpoint)
+
+        # Get pool altroot for TrueNAS compatibility
+        pool = get_pool_name(root_dataset)
+        self._altroot = get_pool_altroot(pool, self._logger)
+
+        # Clean up stale clones if any
+        stale_clone = find_stale_clone(root_dataset, self._logger)
+        if stale_clone:
+            self._logger.warning(f"Found stale clone, destroying: {stale_clone}")
+            try:
+                destroy_clone_tree(stale_clone, self._logger)
+            except ZfsError as e:
+                raise CloneError(f"Failed to clean stale clone: {e}") from e
+
+        # Create clone tree
+        try:
+            create_clone_tree(
+                root_dataset,
+                datasets,
+                snapshot_name,
+                clone_root,
+                clone_mountpoint,
+                self._altroot,
+                self._logger,
+            )
+        except ZfsError as e:
+            raise CloneError(f"Failed to create clone tree: {e}") from e
+
+        return clone_mountpoint
+
+    def sync(
+        self,
+        source: Path,
+        destination: str,
+        config_path: Path,
+        transfers: int,
+        tpslimit: int,
+        dry_run: bool,
+        keep_versions: int,
+        timestamp: str,
+    ) -> int:
+        """Run rclone sync operation.
+
+        Args:
+            source: Source path to sync from.
+            destination: rclone destination.
+            config_path: Path to rclone configuration file.
+            transfers: Number of parallel transfers.
+            tpslimit: Transactions per second limit.
+            dry_run: If True, perform trial run.
+            keep_versions: Number of versions to keep (for backup-dir).
+            timestamp: Timestamp for version directory.
+
+        Returns:
+            Number of files transferred.
+
+        Raises:
+            SyncError: If sync fails.
+        """
+        from cloud_mirror.rclone import RcloneSyncConfig, RcloneSyncError, run_rclone_sync
+
+        config = RcloneSyncConfig(
+            source=source,
+            destination=destination,
+            config_path=config_path,
+            transfers=transfers,
+            tpslimit=tpslimit,
+            dry_run=dry_run,
+            keep_versions=keep_versions,
+            timestamp=timestamp,
+        )
+
+        try:
+            result = run_rclone_sync(config, logger=self._logger)
+            return result.files_transferred
+        except RcloneSyncError as e:
+            raise SyncError(f"Sync failed: {e}") from e
+
+    def cleanup_versions(
+        self,
+        destination: str,
+        config_path: Path,
+        keep_versions: int,
+    ) -> int:
+        """Cleanup old version directories.
+
+        Args:
+            destination: rclone destination.
+            config_path: Path to rclone configuration file.
+            keep_versions: Number of versions to keep.
+
+        Returns:
+            Number of versions deleted.
+        """
+        from cloud_mirror.rclone import cleanup_old_versions
+
+        result = cleanup_old_versions(
+            destination,
+            config_path,
+            keep_versions,
+            logger=self._logger,
+        )
+        return result.deleted_count
+
+    def destroy_clone_tree(self, root_dataset: str) -> None:
+        """Destroy the clone tree.
+
+        Args:
+            root_dataset: Root dataset name (clone name derived from this).
+        """
+        from cloud_mirror.zfs import destroy_clone_tree, get_clone_dataset_name
+
+        clone_root = get_clone_dataset_name(root_dataset)
+        destroy_clone_tree(clone_root, self._logger)
+
+    def destroy_snapshot(self, root_dataset: str, snapshot_name: str) -> None:
+        """Destroy recursive snapshot.
+
+        Args:
+            root_dataset: Root dataset name.
+            snapshot_name: Name of the snapshot (without @).
+        """
+        from cloud_mirror.zfs import destroy_recursive_snapshot
+
+        destroy_recursive_snapshot(root_dataset, snapshot_name, self._logger)
+
+
+# =============================================================================
+# Main Entry Point
+# =============================================================================
+
+
+def run_push(
+    dataset: str,
+    destination: str,
+    config_path: Path | None = None,
+    transfers: int = 64,
+    tpslimit: int = 12,
+    dry_run: bool = False,
+    keep_versions: int = 0,
+    keep_clone: bool = False,
+    keep_snapshot: bool = False,
+    verbose: int = 0,
+) -> int:
+    """Execute a push operation with locking and error handling.
+
+    This is the main entry point for the push command. It:
+    1. Acquires a per-pool lock
+    2. Creates RealPushOperations
+    3. Runs PushOrchestrator
+    4. Handles errors with user-friendly messages
+
+    Args:
+        dataset: ZFS dataset to push.
+        destination: rclone destination (e.g., "dropbox:backup").
+        config_path: Path to rclone config, or None for default.
+        transfers: Number of parallel transfers.
+        tpslimit: Transactions per second limit.
+        dry_run: If True, perform trial run.
+        keep_versions: Number of old versions to keep.
+        keep_clone: If True, keep clone tree after sync.
+        keep_snapshot: If True, keep snapshot after sync.
+        verbose: Verbosity level (0=quiet, 1=info, 2=debug).
+
+    Returns:
+        Exit code: 0 for success, 1 for failure.
+    """
+    import sys
+
+    # Setup logging based on verbose level
+    log_level = logging.WARNING
+    if verbose >= 2:
+        log_level = logging.DEBUG
+    elif verbose >= 1:
+        log_level = logging.INFO
+
+    logging.basicConfig(
+        level=log_level,
+        format="%(levelname)s: %(message)s",
+        stream=sys.stderr,
+    )
+    logger = logging.getLogger("cloud-mirror")
+    logger.setLevel(log_level)
+
+    # Resolve config path
+    if config_path is None:
+        config_path = Path.home() / ".config" / "rclone" / "rclone.conf"
+
+    try:
+        with pool_lock(dataset):
+            logger.info(f"Starting push: {dataset} -> {destination}")
+
+            # Create real operations and orchestrator
+            operations = RealPushOperations(logger)
+            orchestrator = PushOrchestrator(operations, logger)
+
+            # Build config
+            config = PushConfig(
+                dataset=dataset,
+                destination=destination,
+                config_path=config_path,
+                transfers=transfers,
+                tpslimit=tpslimit,
+                dry_run=dry_run,
+                keep_versions=keep_versions,
+                keep_clone=keep_clone,
+                keep_snapshot=keep_snapshot,
+            )
+
+            # Run push
+            result = orchestrator.run(config)
+
+            if result.success:
+                logger.info(
+                    f"Push complete: {result.files_transferred} files transferred"
+                )
+                return 0
+            else:
+                return 1
+
+    except LockError as e:
+        print(f"Error: {e}", file=sys.stderr)  # noqa: T201
+        print("Suggestion: Wait for the other operation to complete.", file=sys.stderr)  # noqa: T201
+        return 1
+
+    except ValidationError as e:
+        print(f"Error: {e}", file=sys.stderr)  # noqa: T201
+        print("Suggestion: Check that the dataset exists and rclone is configured.", file=sys.stderr)  # noqa: T201
+        return 1
+
+    except SnapshotError as e:
+        print(f"Error: {e}", file=sys.stderr)  # noqa: T201
+        print("Suggestion: Check ZFS permissions and disk space.", file=sys.stderr)  # noqa: T201
+        return 1
+
+    except CloneError as e:
+        print(f"Error: {e}", file=sys.stderr)  # noqa: T201
+        print("Suggestion: Check for existing clones and ZFS permissions.", file=sys.stderr)  # noqa: T201
+        return 1
+
+    except SyncError as e:
+        print(f"Error: {e}", file=sys.stderr)  # noqa: T201
+        print("Suggestion: Check network connectivity and rclone configuration.", file=sys.stderr)  # noqa: T201
+        return 1
+
+    except KeyboardInterrupt:
+        print("\nInterrupted by user.", file=sys.stderr)  # noqa: T201
+        return 130  # Standard exit code for SIGINT
+
+    except Exception as e:
+        logger.exception("Unexpected error")
+        print(f"Error: Unexpected error: {e}", file=sys.stderr)  # noqa: T201
+        return 1

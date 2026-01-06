@@ -13,13 +13,27 @@ Level 3 (Internet): Real Dropbox
 from __future__ import annotations
 
 import logging
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-# rclone binary path (configurable for testing)
-RCLONE_BIN = "/usr/bin/rclone"
+
+def _find_rclone_bin() -> str:
+    """Find the rclone binary path.
+
+    Uses shutil.which to find rclone in PATH, falling back to /usr/bin/rclone
+    if not found (for production environments where PATH may not include it).
+    """
+    found = shutil.which("rclone")
+    if found:
+        return found
+    return "/usr/bin/rclone"
+
+
+# rclone binary path (dynamically discovered)
+RCLONE_BIN = _find_rclone_bin()
 
 # Default sync parameters
 DEFAULT_TRANSFERS = 64
