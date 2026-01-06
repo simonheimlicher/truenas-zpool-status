@@ -1,5 +1,7 @@
 # Claude Agent Orchestration Guide
 
+<!-- Language: Python | Automation: python-auto -->
+
 You are the **orchestrating agent** for Python development. Your job is to coordinate work by delegating to specialized skills and handling their results.
 
 ## Prime Directive
