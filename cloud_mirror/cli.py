@@ -164,6 +164,104 @@ def _create_parser() -> argparse.ArgumentParser:
         help="Increase output verbosity (use -v, -vv, or -vvv)",
     )
 
+    # Sync subcommand (bidirectional - auto-detects push or pull)
+    sync_parser = subparsers.add_parser(
+        "sync",
+        help="Sync between ZFS dataset and remote (auto-detects direction)",
+        description="Sync between a ZFS dataset and a remote destination. "
+        "Direction is auto-detected: remote first = pull, dataset first = push.",
+    )
+
+    sync_parser.add_argument(
+        "source",
+        type=str,
+        help="Source (dataset for push, remote for pull)",
+    )
+
+    sync_parser.add_argument(
+        "destination",
+        type=str,
+        help="Destination (remote for push, dataset for pull)",
+    )
+
+    sync_parser.add_argument(
+        "--transfers",
+        type=_positive_int,
+        default=DEFAULT_TRANSFERS,
+        metavar="N",
+        help=f"Number of parallel transfers (default: {DEFAULT_TRANSFERS})",
+    )
+
+    sync_parser.add_argument(
+        "--tpslimit",
+        type=_positive_int,
+        default=DEFAULT_TPSLIMIT,
+        metavar="N",
+        help=f"Transactions per second limit (default: {DEFAULT_TPSLIMIT})",
+    )
+
+    sync_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Perform a trial run with no changes made",
+    )
+
+    sync_parser.add_argument(
+        "--config",
+        type=_path_type,
+        default=None,
+        metavar="PATH",
+        help="Path to rclone configuration file",
+    )
+
+    # Push-specific options for sync
+    sync_parser.add_argument(
+        "--keep-versions",
+        type=_positive_int,
+        default=DEFAULT_KEEP_VERSIONS,
+        metavar="N",
+        help=f"Number of old versions to keep (push only, default: {DEFAULT_KEEP_VERSIONS})",
+    )
+
+    sync_parser.add_argument(
+        "--keep-snapshot",
+        action="store_true",
+        default=False,
+        help="Keep snapshot after sync (push only, default: destroy)",
+    )
+
+    sync_parser.add_argument(
+        "--keep-clone",
+        action="store_true",
+        default=False,
+        help="Keep clone tree after sync (push only, default: destroy)",
+    )
+
+    # Pull-specific options for sync
+    sync_parser.add_argument(
+        "--keep-pre-snapshot",
+        action="store_true",
+        default=False,
+        help="Keep pre-pull snapshot after sync (pull only, default: destroy)",
+    )
+
+    sync_parser.add_argument(
+        "--no-pre-snapshot",
+        action="store_true",
+        default=False,
+        help="Skip creating pre-pull snapshot (pull only, default: create)",
+    )
+
+    # Add verbose flag to sync subcommand
+    sync_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase output verbosity (use -v, -vv, or -vvv)",
+    )
+
     return parser
 
 
