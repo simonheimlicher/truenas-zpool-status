@@ -2,10 +2,11 @@
 CLI argument parsing for cloud-mirror.
 
 This module provides argument parsing for the cloud-mirror command-line tool.
-It uses argparse with subcommands (push, pull - future).
+It uses argparse with simple positional arguments (no subcommands).
+Direction detection happens in main.py based on argument format.
 
 Usage:
-    cloud-mirror.py push <dataset> <destination> [options]
+    cloud-mirror <source> <destination> [options]
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from argparse import Namespace
 
-# Default values for push options
+# Default values for options
 DEFAULT_TRANSFERS = 64
 DEFAULT_TPSLIMIT = 12
 DEFAULT_KEEP_VERSIONS = 0
@@ -59,14 +60,58 @@ def _path_type(value: str) -> Path:
 
 
 def _create_parser() -> argparse.ArgumentParser:
-    """Create the argument parser with all subcommands.
+    """Create the argument parser.
 
     Returns:
         Configured ArgumentParser.
     """
     parser = argparse.ArgumentParser(
         prog="cloud-mirror",
-        description="Sync ZFS datasets to cloud storage with snapshot-based consistency.",
+        description="Mirror ZFS datasets to/from cloud storage with snapshot-based consistency.",
+    )
+
+    parser.add_argument(
+        "source",
+        type=str,
+        help="Source (dataset for mirror-to-cloud, remote for mirror-from-cloud)",
+    )
+
+    parser.add_argument(
+        "destination",
+        type=str,
+        help="Destination (remote for mirror-to-cloud, dataset for mirror-from-cloud)",
+    )
+
+    # Common options
+    parser.add_argument(
+        "--transfers",
+        type=_positive_int,
+        default=DEFAULT_TRANSFERS,
+        metavar="N",
+        help=f"Number of parallel transfers (default: {DEFAULT_TRANSFERS})",
+    )
+
+    parser.add_argument(
+        "--tpslimit",
+        type=_positive_int,
+        default=DEFAULT_TPSLIMIT,
+        metavar="N",
+        help=f"Transactions per second limit (default: {DEFAULT_TPSLIMIT})",
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Perform a trial run with no changes made",
+    )
+
+    parser.add_argument(
+        "--config",
+        type=_path_type,
+        default=None,
+        metavar="PATH",
+        help="Path to rclone configuration file",
     )
 
     parser.add_argument(
@@ -77,189 +122,42 @@ def _create_parser() -> argparse.ArgumentParser:
         help="Increase output verbosity (use -v, -vv, or -vvv)",
     )
 
-    subparsers = parser.add_subparsers(
-        dest="command",
-        title="commands",
-        description="Available commands",
-    )
-
-    # Push subcommand
-    push_parser = subparsers.add_parser(
-        "push",
-        help="Push local ZFS dataset to remote",
-        description="Push a ZFS dataset to a remote destination using rclone.",
-    )
-
-    push_parser.add_argument(
-        "dataset",
-        type=str,
-        help="ZFS dataset to push (e.g., pool/data)",
-    )
-
-    push_parser.add_argument(
-        "destination",
-        type=str,
-        help="Remote destination (e.g., dropbox:backup)",
-    )
-
-    push_parser.add_argument(
+    # Mirror-to-cloud specific options
+    parser.add_argument(
         "--keep-versions",
         type=_positive_int,
         default=DEFAULT_KEEP_VERSIONS,
         metavar="N",
-        help=f"Number of old versions to keep (default: {DEFAULT_KEEP_VERSIONS})",
+        help=f"Number of old versions to keep on remote (default: {DEFAULT_KEEP_VERSIONS})",
     )
 
-    push_parser.add_argument(
+    parser.add_argument(
         "--keep-snapshot",
         action="store_true",
         default=False,
-        help="Keep snapshot after sync (default: destroy)",
+        help="Keep snapshot after mirror (default: destroy)",
     )
 
-    push_parser.add_argument(
+    parser.add_argument(
         "--keep-clone",
         action="store_true",
         default=False,
-        help="Keep clone tree after sync (default: destroy)",
+        help="Keep clone tree after mirror (default: destroy)",
     )
 
-    push_parser.add_argument(
-        "--transfers",
-        type=_positive_int,
-        default=DEFAULT_TRANSFERS,
-        metavar="N",
-        help=f"Number of parallel transfers (default: {DEFAULT_TRANSFERS})",
-    )
-
-    push_parser.add_argument(
-        "--tpslimit",
-        type=_positive_int,
-        default=DEFAULT_TPSLIMIT,
-        metavar="N",
-        help=f"Transactions per second limit (default: {DEFAULT_TPSLIMIT})",
-    )
-
-    push_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        default=False,
-        help="Perform a trial run with no changes made",
-    )
-
-    push_parser.add_argument(
-        "--config",
-        type=_path_type,
-        default=None,
-        metavar="PATH",
-        help="Path to rclone configuration file",
-    )
-
-    # Add verbose flag to push subcommand as well
-    push_parser.add_argument(
-        "-v",
-        "--verbose",
-        action="count",
-        default=0,
-        help="Increase output verbosity (use -v, -vv, or -vvv)",
-    )
-
-    # Sync subcommand (bidirectional - auto-detects push or pull)
-    sync_parser = subparsers.add_parser(
-        "sync",
-        help="Sync between ZFS dataset and remote (auto-detects direction)",
-        description="Sync between a ZFS dataset and a remote destination. "
-        "Direction is auto-detected: remote first = pull, dataset first = push.",
-    )
-
-    sync_parser.add_argument(
-        "source",
-        type=str,
-        help="Source (dataset for push, remote for pull)",
-    )
-
-    sync_parser.add_argument(
-        "destination",
-        type=str,
-        help="Destination (remote for push, dataset for pull)",
-    )
-
-    sync_parser.add_argument(
-        "--transfers",
-        type=_positive_int,
-        default=DEFAULT_TRANSFERS,
-        metavar="N",
-        help=f"Number of parallel transfers (default: {DEFAULT_TRANSFERS})",
-    )
-
-    sync_parser.add_argument(
-        "--tpslimit",
-        type=_positive_int,
-        default=DEFAULT_TPSLIMIT,
-        metavar="N",
-        help=f"Transactions per second limit (default: {DEFAULT_TPSLIMIT})",
-    )
-
-    sync_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        default=False,
-        help="Perform a trial run with no changes made",
-    )
-
-    sync_parser.add_argument(
-        "--config",
-        type=_path_type,
-        default=None,
-        metavar="PATH",
-        help="Path to rclone configuration file",
-    )
-
-    # Push-specific options for sync
-    sync_parser.add_argument(
-        "--keep-versions",
-        type=_positive_int,
-        default=DEFAULT_KEEP_VERSIONS,
-        metavar="N",
-        help=f"Number of old versions to keep (push only, default: {DEFAULT_KEEP_VERSIONS})",
-    )
-
-    sync_parser.add_argument(
-        "--keep-snapshot",
-        action="store_true",
-        default=False,
-        help="Keep snapshot after sync (push only, default: destroy)",
-    )
-
-    sync_parser.add_argument(
-        "--keep-clone",
-        action="store_true",
-        default=False,
-        help="Keep clone tree after sync (push only, default: destroy)",
-    )
-
-    # Pull-specific options for sync
-    sync_parser.add_argument(
+    # Mirror-from-cloud specific options
+    parser.add_argument(
         "--keep-pre-snapshot",
         action="store_true",
         default=False,
-        help="Keep pre-pull snapshot after sync (pull only, default: destroy)",
+        help="Keep pre-mirror snapshot after mirror (default: destroy on success)",
     )
 
-    sync_parser.add_argument(
+    parser.add_argument(
         "--no-pre-snapshot",
         action="store_true",
         default=False,
-        help="Skip creating pre-pull snapshot (pull only, default: create)",
-    )
-
-    # Add verbose flag to sync subcommand
-    sync_parser.add_argument(
-        "-v",
-        "--verbose",
-        action="count",
-        default=0,
-        help="Increase output verbosity (use -v, -vv, or -vvv)",
+        help="Skip creating pre-mirror snapshot (default: create)",
     )
 
     return parser
@@ -278,11 +176,4 @@ def parse_args(args: list[str] | None = None) -> Namespace:
         SystemExit: If arguments are invalid or --help is requested.
     """
     parser = _create_parser()
-    parsed = parser.parse_args(args)
-
-    # Merge verbose from main parser and subparser
-    # The subparser's -v flag is preferred if both are used
-    if hasattr(parsed, "verbose") and parsed.verbose is None:
-        parsed.verbose = 0
-
-    return parsed
+    return parser.parse_args(args)

@@ -4,11 +4,13 @@
 
 ## 🎯 What Is This Project?
 
-**cloud-mirror** syncs ZFS datasets to cloud storage (Dropbox) via rclone, preserving the snapshot-based structure of ZFS.
+**cloud-mirror** mirrors ZFS datasets to/from cloud storage (Dropbox) via rclone, preserving the snapshot-based structure of ZFS.
 
-**Current State**: `dropbox-push.py` is a working 1400-line script that implements push functionality. It works but lacks tests and is not modular. The goal is to extract this into a testable `cloud-mirror.py` module while adding pull capability.
+**Mirror** means make the destination exactly match the source - files present only at the destination are deleted.
 
-**The Challenge**: ZFS doesn't run on macOS natively, so we need a Colima VM with ZFS installed just to run tests. This is why capability-10 (test infrastructure) must complete before capability-27 (push) or capability-54 (pull).
+**Current State**: `dropbox-push.py` is a working 1400-line script that implements mirroring to cloud functionality. It works but lacks tests and is not modular. The goal is to extract this into a testable `cloud_mirror/` package while adding mirror-from-cloud capability.
+
+**The Challenge**: ZFS doesn't run on macOS natively, so we need a Colima VM with ZFS installed just to run tests. This is why capability-10 (test infrastructure) must complete before capability-27 (mirror to cloud) or capability-54 (mirror from cloud).
 
 ## 🖥️ Development vs Production Environments
 
@@ -217,38 +219,38 @@ return result.returncode == 0 and "is running" in combined_output
 **Status**: ✅ COMPLETE - All features done (Feature-32, Feature-54, Feature-76 have DONE.md)
 **Why First**: Without this, we cannot run any tests that touch ZFS
 
-### Capability 27: Dropbox Push
+### Capability 27: Mirror to Cloud
 
-**Purpose**: Extract `dropbox-push.py` functionality into testable `cloud-mirror.py`
+**Purpose**: Extract `dropbox-push.py` functionality into testable `cloud_mirror/` package
 **Reference**: `dropbox-push.py` is the working implementation to be refactored
 **Status**: Ready to start (unblocked by capability-10)
 
-### Capability 54: Dropbox Mirror Pull
+### Capability 54: Mirror from Cloud
 
-**Purpose**: Add pull direction to `cloud-mirror.py` (remote → ZFS)
+**Purpose**: Add mirror-from-cloud direction to `cloud-mirror` (remote → ZFS)
 **Status**: Specs written, implementation pending (blocked by capability-10)
 
 ## 🧠 Key Concepts
 
-### Clone Tree Approach (Push)
+### Clone Tree Approach (Mirror to Cloud)
 
 Rather than traversing `.zfs/snapshot/` (which shows live child dataset mountpoints), we create clones from recursive snapshots, providing an immutable, consistent view.
 
-### Direction Detection (cloud-mirror.py)
+### Direction Detection
 
-Auto-detect push vs pull based on argument order:
+Auto-detect direction based on argument order:
 
-- `cloud-mirror.py dataset remote` → PUSH (ZFS to Dropbox)
-- `cloud-mirror.py remote dataset` → PULL (Dropbox to ZFS)
+- `cloud-mirror dataset remote` → Mirror to cloud (ZFS → Dropbox)
+- `cloud-mirror remote dataset` → Mirror from cloud (Dropbox → ZFS)
 
 Detection: rclone remotes have format `remote:path`, ZFS datasets are `pool/dataset`.
 
-### Pre-Pull Snapshot (Pull)
+### Pre-Mirror Snapshot (Mirror from Cloud)
 
-Pull operations create a snapshot before syncing, enabling rollback:
+Mirror-from-cloud operations create a snapshot before mirroring, enabling rollback:
 
 ```bash
-zfs rollback testpool/target@dropboxpull-pre-TIMESTAMP
+zfs rollback testpool/target@cloudmirror-pre-TIMESTAMP
 ```
 
 ## 🔄 Workflow Summary

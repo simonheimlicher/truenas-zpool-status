@@ -27,7 +27,7 @@ class TestConfigFileDefaults:
         """WHEN no --config specified THEN uses ~/.config/rclone/rclone.conf."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "testpool/data", "remote:backup"])
+        args = parse_args(["testpool/data", "remote:backup"])
 
         # config should be None (will be resolved to default later)
         assert args.config is None
@@ -37,7 +37,7 @@ class TestConfigFileDefaults:
         from cloud_mirror.cli import parse_args
 
         args = parse_args(
-            ["push", "testpool/data", "remote:backup", "--config", "/custom/rclone.conf"]
+            ["testpool/data", "remote:backup", "--config", "/custom/rclone.conf"]
         )
 
         assert args.config == Path("/custom/rclone.conf")
@@ -92,7 +92,7 @@ class TestDryRunFlag:
         """WHEN --dry-run specified THEN flag is True."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "testpool/data", "remote:backup", "--dry-run"])
+        args = parse_args(["testpool/data", "remote:backup", "--dry-run"])
 
         assert args.dry_run is True
 
@@ -100,7 +100,7 @@ class TestDryRunFlag:
         """WHEN --dry-run not specified THEN flag is False."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "testpool/data", "remote:backup"])
+        args = parse_args(["testpool/data", "remote:backup"])
 
         assert args.dry_run is False
 
@@ -117,7 +117,7 @@ class TestVerboseFlag:
         """WHEN -v specified THEN verbose is 1."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "testpool/data", "remote:backup", "-v"])
+        args = parse_args(["testpool/data", "remote:backup", "-v"])
 
         assert args.verbose == 1
 
@@ -125,7 +125,7 @@ class TestVerboseFlag:
         """WHEN -vv specified THEN verbose is 2."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "testpool/data", "remote:backup", "-vv"])
+        args = parse_args(["testpool/data", "remote:backup", "-vv"])
 
         assert args.verbose == 2
 
@@ -133,7 +133,7 @@ class TestVerboseFlag:
         """WHEN no -v specified THEN verbose is 0."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "testpool/data", "remote:backup"])
+        args = parse_args(["testpool/data", "remote:backup"])
 
         assert args.verbose == 0
 

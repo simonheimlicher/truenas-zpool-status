@@ -2,31 +2,33 @@
 
 ## What Changes
 
-Implement argument parsing for cloud-mirror.py push command using argparse.
+Implement argument parsing for cloud-mirror using argparse with simple positional arguments (no subcommands).
 
 ## Functional Requirements
 
-### FR1: Positional arguments for dataset and destination
+### FR1: Positional arguments for source and destination
 
 ```gherkin
-GIVEN cloud-mirror.py script
-WHEN executed with: cloud-mirror.py push testpool/data dropbox:backup
-THEN args.dataset = "testpool/data"
+GIVEN cloud-mirror script
+WHEN executed with: cloud-mirror testpool/data dropbox:backup
+THEN args.source = "testpool/data"
 AND args.destination = "dropbox:backup"
 ```
 
-### FR2: Push-specific options
+### FR2: Options
 
 ```gherkin
-GIVEN cloud-mirror.py with options:
-  | option          | default |
-  | --keep-versions | 0       |
-  | --keep-snapshot | false   |
-  | --keep-clone    | false   |
-  | --transfers     | 64      |
-  | --tpslimit      | 12      |
-  | --dry-run       | false   |
-  | --config        | None    |
+GIVEN cloud-mirror with options:
+  | option              | default |
+  | --keep-versions     | 0       |
+  | --keep-snapshot     | false   |
+  | --keep-clone        | false   |
+  | --keep-pre-snapshot | false   |
+  | --no-pre-snapshot   | false   |
+  | --transfers         | 64      |
+  | --tpslimit          | 12      |
+  | --dry-run           | false   |
+  | --config            | None    |
 WHEN parse_args called
 THEN all options available in args namespace with defaults
 ```
@@ -55,7 +57,7 @@ AND exits with code 0
 
 ## Implementation Notes
 
-- Use argparse with subcommands (push, pull - future)
+- Use argparse with simple positional arguments (no subcommands)
+- Direction detection happens in main.py, not in argument parsing
 - Return namespace with typed attributes
-- Validate dataset format (pool/path)
-- Validate destination format (remote:path)
+- Validate source and destination formats in direction.py (not in CLI)

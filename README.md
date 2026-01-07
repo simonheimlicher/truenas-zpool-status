@@ -1,23 +1,25 @@
 # cloud-mirror
 
-Sync ZFS datasets to cloud storage (Dropbox) with snapshot-based consistency for TrueNAS SCALE.
+Mirror ZFS datasets to/from cloud storage (Dropbox) with snapshot-based consistency for TrueNAS SCALE.
+
+**Mirror** means make the destination exactly match the source - files present only at the destination are deleted.
 
 ## Why This Tool?
 
 TrueNAS SCALE's built-in Cloud Sync Tasks fail on datasets with nested child datasets because:
 
-1. **Files change during push** - the original problem
+1. **Files change during operations** - the original problem
 2. **Snapshots don't help** - traversing `.zfs/snapshot/<snap>/` still shows **live** child dataset mountpoints, not their snapshot contents
 
 **cloud-mirror** solves both problems by creating a **clone tree** from recursive snapshots. The clone tree provides a truly immutable, consistent view of the entire dataset hierarchy.
 
 ## Features
 
-- **Bidirectional sync**: Push (ZFS to cloud) and pull (cloud to ZFS)
-- **Auto-direction detection**: `cloud-mirror sync pool/data dropbox:backup` → push; reverse args → pull
+- **Bidirectional mirroring**: Mirror to cloud (ZFS → remote) or from cloud (remote → ZFS)
+- **Auto-direction detection**: `cloud-mirror pool/data dropbox:backup` mirrors to cloud; reverse args mirrors from cloud
 - **Consistent backups**: Clones the entire snapshot tree for nested datasets
 - **Version retention**: Optionally keep N previous versions on remote (`--keep-versions`)
-- **Pre-pull snapshots**: Create rollback points before pulling (configurable)
+- **Pre-mirror snapshots**: Create rollback points before mirroring from cloud (configurable)
 - **Concurrent run protection**: Pool-level locking prevents overlapping operations
 - **Cron-friendly**: Silent on success, actionable errors on failure
 
@@ -26,46 +28,46 @@ TrueNAS SCALE's built-in Cloud Sync Tasks fail on datasets with nested child dat
 ```
 cloud_mirror/
 ├── __init__.py
-├── cli.py          # Argument parsing (push, sync commands)
-├── main.py         # Entry point, command dispatch
-├── direction.py    # Auto-detect push vs pull from arguments
-├── push.py         # Push orchestrator (ZFS → remote)
-├── pull.py         # Pull orchestrator (remote → ZFS)
+├── cli.py          # Argument parsing
+├── main.py         # Entry point, direction detection, dispatch
+├── direction.py    # Auto-detect direction from arguments
+├── push.py         # Mirror to cloud orchestrator (ZFS → remote)
+├── pull.py         # Mirror from cloud orchestrator (remote → ZFS)
 ├── zfs.py          # ZFS operations (snapshots, clones, datasets)
-└── rclone.py       # rclone wrapper (sync, version backup)
+└── rclone.py       # rclone wrapper (mirror operations, version backup)
 ```
 
 ### Direction Detection
 
-The `sync` command auto-detects direction based on argument format:
+Direction is auto-detected from argument format:
 
-| First Arg        | Second Arg       | Direction                 |
-| ---------------- | ---------------- | ------------------------- |
-| `pool/data`      | `dropbox:backup` | **PUSH** (local → remote) |
-| `dropbox:backup` | `pool/data`      | **PULL** (remote → local) |
+| First Arg        | Second Arg       | Direction                              |
+| ---------------- | ---------------- | -------------------------------------- |
+| `pool/data`      | `dropbox:backup` | **Mirror to cloud** (local → remote)   |
+| `dropbox:backup` | `pool/data`      | **Mirror from cloud** (remote → local) |
 
 Detection rule: rclone remotes contain `:` before any `/`; ZFS datasets have `/` before any `:` (e.g., `tank/vm:disk0`).
 
 ## How It Works
 
-### Push Workflow
+### Mirror to Cloud Workflow
 
 1. **Acquire lock** - prevents concurrent operations on the same pool
 2. **Validate** - check dataset exists, rclone config valid, remote accessible
 3. **Enumerate datasets** - list all nested child datasets recursively
-4. **Create recursive snapshot** - `pool/data@cloudpush-2025-01-06T12-00-00Z`
+4. **Create recursive snapshot** - `pool/data@cloudmirror-2025-01-06T12-00-00Z`
 5. **Create clone tree** - clone each snapshot to a parallel tree structure
-6. **Sync via rclone** - push from clone mountpoint to remote
+6. **Mirror via rclone** - make remote exactly match clone mountpoint
 7. **Cleanup versions** - delete old `.versions/` if `--keep-versions` set
 8. **Destroy clones** - remove temporary clone tree
-9. **Destroy snapshot** - remove push snapshot
+9. **Destroy snapshot** - remove snapshot
 
-### Pull Workflow
+### Mirror from Cloud Workflow
 
 1. **Acquire lock** - prevents concurrent operations
-2. **Create pre-pull snapshot** - `pool/data@cloudpull-pre-2025-01-06T12-00-00Z` (rollback point)
-3. **Sync via rclone** - pull from remote to dataset mountpoint
-4. **Cleanup** - optionally keep pre-pull snapshot for rollback
+2. **Create pre-mirror snapshot** - `pool/data@cloudmirror-pre-2025-01-06T12-00-00Z` (rollback point)
+3. **Mirror via rclone** - make local dataset exactly match remote
+4. **Cleanup** - optionally keep pre-mirror snapshot for rollback
 
 ### Clone Tree Approach
 
@@ -101,8 +103,8 @@ tests/
 │   └── rclone/              # rclone command building
 └── integration/             # Require ZFS or network
     ├── zfs/                 # Snapshot/clone operations
-    ├── rclone/              # Sync operations
-    ├── push/                # Full push workflow
+    ├── rclone/              # Mirror operations
+    ├── push/                # Full mirror-to-cloud workflow
     └── dropbox/             # Real Dropbox (Level 3)
 ```
 
@@ -213,56 +215,44 @@ rclone --config /mnt/apps/cloud-mirror/rclone.conf lsd dropbox:
 
 ## Usage
 
-### Push Command
-
-Push a ZFS dataset to a remote:
+Direction is auto-detected from argument order:
 
 ```bash
-python3 -m cloud_mirror push <dataset> <destination> [options]
+cloud-mirror <source> <destination> [options]
 
-# Examples:
-python3 -m cloud_mirror push apps/config dropbox:TrueNAS-Backup/apps-config \
+# Mirror to cloud (dataset first)
+cloud-mirror apps/config dropbox:TrueNAS-Backup/apps-config \
     --config /mnt/apps/cloud-mirror/rclone.conf
 
-# With version retention
-python3 -m cloud_mirror push apps/data dropbox:Backup/data \
+# Mirror from cloud (remote first)
+cloud-mirror dropbox:Backup/data apps/data \
+    --config /mnt/apps/cloud-mirror/rclone.conf
+
+# With version retention (when mirroring to cloud)
+cloud-mirror apps/data dropbox:Backup/data \
     --config /mnt/apps/cloud-mirror/rclone.conf \
     --keep-versions 3
 
 # Dry run
-python3 -m cloud_mirror push apps/config dropbox:Backup \
+cloud-mirror apps/config dropbox:Backup \
     --config /mnt/apps/cloud-mirror/rclone.conf \
     --dry-run -v
 ```
 
-### Sync Command (Auto-Direction)
-
-Automatically detect push or pull based on argument order:
-
-```bash
-# Push (dataset first)
-python3 -m cloud_mirror sync apps/config dropbox:Backup \
-    --config /mnt/apps/cloud-mirror/rclone.conf
-
-# Pull (remote first)
-python3 -m cloud_mirror sync dropbox:Backup apps/config \
-    --config /mnt/apps/cloud-mirror/rclone.conf
-```
-
 ### Options
 
-| Option                | Default | Description                       |
-| --------------------- | ------- | --------------------------------- |
-| `--config PATH`       | None    | Path to rclone config file        |
-| `--transfers N`       | 64      | Parallel file transfers           |
-| `--tpslimit N`        | 12      | Transactions per second limit     |
-| `--dry-run`           | False   | Trial run, no changes             |
-| `-v, -vv, -vvv`       | 0       | Verbosity level                   |
-| `--keep-versions N`   | 0       | Keep N old versions (push)        |
-| `--keep-snapshot`     | False   | Keep snapshot after sync (push)   |
-| `--keep-clone`        | False   | Keep clone tree after sync (push) |
-| `--keep-pre-snapshot` | False   | Keep pre-pull snapshot (pull)     |
-| `--no-pre-snapshot`   | False   | Skip pre-pull snapshot (pull)     |
+| Option                | Default | Description                                         |
+| --------------------- | ------- | --------------------------------------------------- |
+| `--config PATH`       | None    | Path to rclone config file                          |
+| `--transfers N`       | 64      | Parallel file transfers                             |
+| `--tpslimit N`        | 12      | Transactions per second limit                       |
+| `--dry-run`           | False   | Trial run, no changes                               |
+| `-v, -vv, -vvv`       | 0       | Verbosity level                                     |
+| `--keep-versions N`   | 0       | Keep N old versions (when mirroring to cloud)       |
+| `--keep-snapshot`     | False   | Keep snapshot after mirror (when to cloud)          |
+| `--keep-clone`        | False   | Keep clone tree after mirror (when to cloud)        |
+| `--keep-pre-snapshot` | False   | Keep pre-mirror snapshot (when from cloud)          |
+| `--no-pre-snapshot`   | False   | Skip creating pre-mirror snapshot (when from cloud) |
 
 ## Cron Job Setup for TrueNAS SCALE 25.10
 
@@ -270,15 +260,15 @@ python3 -m cloud_mirror sync dropbox:Backup apps/config \
 
 Navigate to **System > Advanced Settings > Cron Jobs > Add**
 
-| Field                    | Value                                                                                                                     |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| **Description**          | Cloud Sync: apps/config to Dropbox                                                                                        |
-| **Command**              | `python3 -m cloud_mirror push apps/config dropbox:TrueNAS-Backup/apps-config --config /mnt/apps/cloud-mirror/rclone.conf` |
-| **Run As User**          | root                                                                                                                      |
-| **Schedule**             | Custom: `0 3 * * *` (3:00 AM daily)                                                                                       |
-| **Hide Standard Output** | Checked                                                                                                                   |
-| **Hide Standard Error**  | Unchecked (receive error emails)                                                                                          |
-| **Enabled**              | Checked                                                                                                                   |
+| Field                    | Value                                                                                                     |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- |
+| **Description**          | Cloud Mirror: apps/config to Dropbox                                                                      |
+| **Command**              | `cloud-mirror apps/config dropbox:TrueNAS-Backup/apps-config --config /mnt/apps/cloud-mirror/rclone.conf` |
+| **Run As User**          | root                                                                                                      |
+| **Schedule**             | Custom: `0 3 * * *` (3:00 AM daily)                                                                       |
+| **Hide Standard Output** | Checked                                                                                                   |
+| **Hide Standard Error**  | Unchecked (receive error emails)                                                                          |
+| **Enabled**              | Checked                                                                                                   |
 
 ### Via CLI
 
@@ -287,8 +277,8 @@ TrueNAS SCALE provides a CLI that persists across reboots:
 ```bash
 # Create cron job via CLI
 midclt call task.cron_job.create '{
-  "description": "Cloud Sync: apps/config to Dropbox",
-  "command": "python3 -m cloud_mirror push apps/config dropbox:TrueNAS-Backup/apps-config --config /mnt/apps/cloud-mirror/rclone.conf",
+  "description": "Cloud Mirror: apps/config to Dropbox",
+  "command": "cloud-mirror apps/config dropbox:TrueNAS-Backup/apps-config --config /mnt/apps/cloud-mirror/rclone.conf",
   "user": "root",
   "schedule": {
     "minute": "0",
@@ -390,9 +380,9 @@ Dropbox will not preserve:
 
 For true ZFS backup, use `zfs send/receive` to another ZFS system.
 
-### Sync is destructive on the remote
+### Mirroring is destructive
 
-`rclone sync` mirrors source to destination. Files deleted locally **will be deleted on Dropbox** (unless `--keep-versions` moves them first).
+Mirroring makes the destination exactly match the source. Files present only at the destination **will be deleted** (unless `--keep-versions` moves them to `.versions/` first when mirroring to cloud).
 
 ### Dry-run still creates local snapshots
 

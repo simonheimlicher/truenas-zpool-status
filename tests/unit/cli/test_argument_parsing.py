@@ -26,7 +26,7 @@ class ParseTestCase:
 
     name: str
     args: list[str]
-    expected_dataset: str | None = None
+    expected_source: str | None = None
     expected_destination: str | None = None
     expected_keep_versions: int = 0
     expected_keep_snapshot: bool = False
@@ -41,14 +41,13 @@ class ParseTestCase:
 PARSE_TYPICAL: dict[str, ParseTestCase] = {
     "BASIC": ParseTestCase(
         name="basic positional arguments",
-        args=["push", "testpool/data", "dropbox:backup"],
-        expected_dataset="testpool/data",
+        args=["testpool/data", "dropbox:backup"],
+        expected_source="testpool/data",
         expected_destination="dropbox:backup",
     ),
     "WITH_OPTIONS": ParseTestCase(
         name="with all options",
         args=[
-            "push",
             "tank/photos",
             "remote:archive",
             "--keep-versions",
@@ -61,7 +60,7 @@ PARSE_TYPICAL: dict[str, ParseTestCase] = {
             "8",
             "--dry-run",
         ],
-        expected_dataset="tank/photos",
+        expected_source="tank/photos",
         expected_destination="remote:archive",
         expected_keep_versions=5,
         expected_keep_snapshot=True,
@@ -72,29 +71,29 @@ PARSE_TYPICAL: dict[str, ParseTestCase] = {
     ),
     "WITH_CONFIG": ParseTestCase(
         name="with config file",
-        args=["push", "pool/data", "remote:dest", "--config", "/path/to/rclone.conf"],
-        expected_dataset="pool/data",
+        args=["pool/data", "remote:dest", "--config", "/path/to/rclone.conf"],
+        expected_source="pool/data",
         expected_destination="remote:dest",
         expected_config=Path("/path/to/rclone.conf"),
     ),
     "VERBOSE_1": ParseTestCase(
         name="single verbose flag",
-        args=["push", "pool/data", "remote:dest", "-v"],
-        expected_dataset="pool/data",
+        args=["pool/data", "remote:dest", "-v"],
+        expected_source="pool/data",
         expected_destination="remote:dest",
         expected_verbose=1,
     ),
     "VERBOSE_2": ParseTestCase(
         name="double verbose flag",
-        args=["push", "pool/data", "remote:dest", "-vv"],
-        expected_dataset="pool/data",
+        args=["pool/data", "remote:dest", "-vv"],
+        expected_source="pool/data",
         expected_destination="remote:dest",
         expected_verbose=2,
     ),
     "VERBOSE_3": ParseTestCase(
         name="triple verbose flag",
-        args=["push", "pool/data", "remote:dest", "-vvv"],
-        expected_dataset="pool/data",
+        args=["pool/data", "remote:dest", "-vvv"],
+        expected_source="pool/data",
         expected_destination="remote:dest",
         expected_verbose=3,
     ),
@@ -103,20 +102,20 @@ PARSE_TYPICAL: dict[str, ParseTestCase] = {
 PARSE_EDGES: dict[str, ParseTestCase] = {
     "NESTED_DATASET": ParseTestCase(
         name="deeply nested dataset",
-        args=["push", "pool/data/photos/2024/vacation", "dropbox:backup/archive"],
-        expected_dataset="pool/data/photos/2024/vacation",
+        args=["pool/data/photos/2024/vacation", "dropbox:backup/archive"],
+        expected_source="pool/data/photos/2024/vacation",
         expected_destination="dropbox:backup/archive",
     ),
     "ROOT_POOL": ParseTestCase(
         name="root pool without path",
-        args=["push", "testpool", "remote:dest"],
-        expected_dataset="testpool",
+        args=["testpool", "remote:dest"],
+        expected_source="testpool",
         expected_destination="remote:dest",
     ),
     "ZERO_VERSIONS": ParseTestCase(
         name="explicit zero versions",
-        args=["push", "pool/data", "remote:dest", "--keep-versions", "0"],
-        expected_dataset="pool/data",
+        args=["pool/data", "remote:dest", "--keep-versions", "0"],
+        expected_source="pool/data",
         expected_destination="remote:dest",
         expected_keep_versions=0,
     ),
@@ -132,23 +131,23 @@ class TestParseTypical:
     """GIVEN typical CLI invocations."""
 
     def test_basic_positional_arguments(self) -> None:
-        """FR1: WHEN push with dataset and destination THEN parsed correctly."""
+        """FR1: WHEN source and destination THEN parsed correctly."""
         from cloud_mirror.cli import parse_args
 
         case = PARSE_TYPICAL["BASIC"]
         args = parse_args(case.args)
 
-        assert args.dataset == case.expected_dataset
+        assert args.source == case.expected_source
         assert args.destination == case.expected_destination
 
     def test_with_all_options(self) -> None:
-        """FR2: WHEN push with all options THEN all parsed correctly."""
+        """FR2: WHEN all options THEN all parsed correctly."""
         from cloud_mirror.cli import parse_args
 
         case = PARSE_TYPICAL["WITH_OPTIONS"]
         args = parse_args(case.args)
 
-        assert args.dataset == case.expected_dataset
+        assert args.source == case.expected_source
         assert args.destination == case.expected_destination
         assert args.keep_versions == case.expected_keep_versions
         assert args.keep_snapshot == case.expected_keep_snapshot
@@ -209,7 +208,7 @@ class TestParseEdges:
         case = PARSE_EDGES["NESTED_DATASET"]
         args = parse_args(case.args)
 
-        assert args.dataset == case.expected_dataset
+        assert args.source == case.expected_source
         assert args.destination == case.expected_destination
 
     def test_root_pool_without_path(self) -> None:
@@ -219,7 +218,7 @@ class TestParseEdges:
         case = PARSE_EDGES["ROOT_POOL"]
         args = parse_args(case.args)
 
-        assert args.dataset == case.expected_dataset
+        assert args.source == case.expected_source
 
     def test_explicit_zero_versions(self) -> None:
         """WHEN --keep-versions 0 THEN defaults preserved."""
@@ -238,89 +237,89 @@ class TestParseDefaults:
         """Default keep_versions is 0."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "pool/data", "remote:dest"])
+        args = parse_args(["pool/data", "remote:dest"])
         assert args.keep_versions == 0
 
     def test_default_keep_snapshot_is_false(self) -> None:
         """Default keep_snapshot is False."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "pool/data", "remote:dest"])
+        args = parse_args(["pool/data", "remote:dest"])
         assert args.keep_snapshot is False
 
     def test_default_keep_clone_is_false(self) -> None:
         """Default keep_clone is False."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "pool/data", "remote:dest"])
+        args = parse_args(["pool/data", "remote:dest"])
         assert args.keep_clone is False
 
     def test_default_transfers(self) -> None:
         """Default transfers is 64."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "pool/data", "remote:dest"])
+        args = parse_args(["pool/data", "remote:dest"])
         assert args.transfers == 64
 
     def test_default_tpslimit(self) -> None:
         """Default tpslimit is 12."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "pool/data", "remote:dest"])
+        args = parse_args(["pool/data", "remote:dest"])
         assert args.tpslimit == 12
 
     def test_default_dry_run_is_false(self) -> None:
         """Default dry_run is False."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "pool/data", "remote:dest"])
+        args = parse_args(["pool/data", "remote:dest"])
         assert args.dry_run is False
 
     def test_default_config_is_none(self) -> None:
         """Default config is None."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "pool/data", "remote:dest"])
+        args = parse_args(["pool/data", "remote:dest"])
         assert args.config is None
 
     def test_default_verbose_is_zero(self) -> None:
         """Default verbose is 0."""
         from cloud_mirror.cli import parse_args
 
-        args = parse_args(["push", "pool/data", "remote:dest"])
+        args = parse_args(["pool/data", "remote:dest"])
         assert args.verbose == 0
 
 
 class TestParseErrors:
     """GIVEN invalid arguments."""
 
-    def test_missing_dataset_raises(self) -> None:
-        """WHEN no dataset provided THEN raises SystemExit."""
+    def test_missing_source_raises(self) -> None:
+        """WHEN no source provided THEN raises SystemExit."""
         from cloud_mirror.cli import parse_args
 
         with pytest.raises(SystemExit):
-            parse_args(["push"])
+            parse_args([])
 
     def test_missing_destination_raises(self) -> None:
         """WHEN no destination provided THEN raises SystemExit."""
         from cloud_mirror.cli import parse_args
 
         with pytest.raises(SystemExit):
-            parse_args(["push", "pool/data"])
+            parse_args(["pool/data"])
 
     def test_invalid_keep_versions_raises(self) -> None:
         """WHEN --keep-versions is negative THEN raises SystemExit."""
         from cloud_mirror.cli import parse_args
 
         with pytest.raises(SystemExit):
-            parse_args(["push", "pool/data", "remote:dest", "--keep-versions", "-1"])
+            parse_args(["pool/data", "remote:dest", "--keep-versions", "-1"])
 
     def test_invalid_transfers_raises(self) -> None:
         """WHEN --transfers is not a number THEN raises SystemExit."""
         from cloud_mirror.cli import parse_args
 
         with pytest.raises(SystemExit):
-            parse_args(["push", "pool/data", "remote:dest", "--transfers", "abc"])
+            parse_args(["pool/data", "remote:dest", "--transfers", "abc"])
 
 
 # =============================================================================
@@ -341,17 +340,17 @@ class TestSystematicCoverage:
 
         args = parse_args(case.args)
 
-        assert args.dataset == case.expected_dataset
+        assert args.source == case.expected_source
         assert args.destination == case.expected_destination
 
 
 # =============================================================================
-# Additional Tests: Help and Subcommand Structure
+# Additional Tests: Help
 # =============================================================================
 
 
-class TestHelpAndStructure:
-    """FR4: Test help and command structure."""
+class TestHelp:
+    """FR4: Test help."""
 
     def test_help_exits_zero(self) -> None:
         """WHEN --help THEN exits with code 0."""
@@ -361,20 +360,3 @@ class TestHelpAndStructure:
             parse_args(["--help"])
 
         assert exc_info.value.code == 0
-
-    def test_push_help_exits_zero(self) -> None:
-        """WHEN push --help THEN exits with code 0."""
-        from cloud_mirror.cli import parse_args
-
-        with pytest.raises(SystemExit) as exc_info:
-            parse_args(["push", "--help"])
-
-        assert exc_info.value.code == 0
-
-    def test_command_is_push(self) -> None:
-        """WHEN push subcommand THEN command='push'."""
-        from cloud_mirror.cli import parse_args
-
-        args = parse_args(["push", "pool/data", "remote:dest"])
-
-        assert args.command == "push"

@@ -2,16 +2,17 @@
 
 ## What Changes
 
-Wire together CLI, orchestrator, locking into working cloud-mirror.py script.
+Wire together CLI, direction detection, orchestrator, and locking into working cloud-mirror script.
 
 ## Functional Requirements
 
 ### FR1: CLI invokes orchestrator
 
 ```gherkin
-GIVEN cloud-mirror.py push testpool/data dropbox:backup
+GIVEN cloud-mirror testpool/data dropbox:backup
 WHEN executed
-THEN RealPushOperations created with zfs.py and rclone.py
+THEN direction detected as MIRROR TO CLOUD
+AND RealPushOperations created with zfs.py and rclone.py
 AND PushOrchestrator runs workflow
 AND exit code reflects success (0) or failure (1)
 ```
@@ -65,7 +66,7 @@ AND default is ~/.config/rclone/rclone.conf
 
 ## Implementation Notes
 
-- Main function in cloud-mirror.py
+- Main function in cloud_mirror/main.py with console script entry point
 - Setup logging based on verbose level
 - Wrap errors in user-friendly messages
 - Return appropriate exit codes

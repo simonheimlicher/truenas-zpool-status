@@ -1,25 +1,28 @@
 [project]
 name = "cloud-mirror"
 version = "0.1.0"
-description = "ZFS-to-Dropbox sync utility for TrueNAS SCALE"
+description = "Mirror ZFS datasets to/from cloud storage for TrueNAS SCALE"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
 
+[project.scripts]
+cloud-mirror = "cloud_mirror.main:main"
+
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0",
-    "pytest-cov>=4.0",
-    "python-dotenv>=1.0",
+  "pytest>=8.0",
+  "pytest-cov>=4.0",
+  "python-dotenv>=1.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "specs"]
 markers = [
-    "zfs: mark test as requiring ZFS (deselect with '-m \"not zfs\"')",
-    "vm_required: mark test as requiring Colima VM to be running",
-    "internet_required: mark test as requiring internet and DROPBOX_TEST_TOKEN",
-    "slow: mark test as slow-running",
+  "zfs: mark test as requiring ZFS (deselect with '-m \"not zfs\"')",
+  "vm_required: mark test as requiring Colima VM to be running",
+  "internet_required: mark test as requiring internet and DROPBOX_TEST_TOKEN",
+  "slow: mark test as slow-running",
 ]
 
 [tool.ruff.lint]
@@ -33,7 +36,7 @@ select = ["B", "S", "PT", "T20"]
 [tool.ruff.lint.per-file-ignores]
 # Allow asserts in tests
 "tests/*" = ["S101"]
-"specs/*" = ["S101"] 
+"specs/*" = ["S101"]
 
 [tool.mypy]
 # The "Zero Trust" Typing Configuration
