@@ -6,17 +6,17 @@ Story-32 verifies that Colima is installed and the VM is accessible for ZFS test
 
 ## Graduated Tests
 
-| Requirement | Graduated To |
-| ----------- | ------------ |
-| FR1: Colima installed | `tests/environment/test_colima.py::TestColimaInstallation::test_colima_command_available` |
-| FR1: Lima dependency | `tests/environment/test_colima.py::TestColimaInstallation::test_lima_dependency_installed` |
-| FR2: VM starts | `tests/environment/test_colima.py::TestColimaVMStatus::test_colima_status_command_works` |
-| FR3: SSH access | `tests/environment/test_colima.py::TestColimaVMStatus::test_vm_running_and_accessible` |
+| Requirement           | Graduated To                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| FR1: Colima installed | `tests/environment/test_colima.py::TestColimaInstallation::test_colima_command_available`  |
+| FR1: Lima dependency  | `tests/environment/test_colima.py::TestColimaInstallation::test_lima_dependency_installed` |
+| FR2: VM starts        | `tests/environment/test_colima.py::TestColimaVMStatus::test_colima_status_command_works`   |
+| FR3: SSH access       | `tests/environment/test_colima.py::TestColimaVMStatus::test_vm_running_and_accessible`     |
 
 ## Tests Remaining in Specs
 
-| Test | Rationale |
-| ---- | --------- |
+| Test                   | Rationale                                                    |
+| ---------------------- | ------------------------------------------------------------ |
 | `test_colima_setup.py` | Kept as reference; graduated version in `tests/environment/` |
 
 ## Changes Made During Graduation

@@ -6,17 +6,17 @@ Story-54 verifies that ZFS is installed and the kernel modules are loaded inside
 
 ## Graduated Tests
 
-| Requirement | Graduated To |
-| ----------- | ------------ |
-| FR1: zfs command available | `tests/environment/test_zfs_in_vm.py::TestZFSInstallation::test_zfs_command_available` |
+| Requirement                  | Graduated To                                                                             |
+| ---------------------------- | ---------------------------------------------------------------------------------------- |
+| FR1: zfs command available   | `tests/environment/test_zfs_in_vm.py::TestZFSInstallation::test_zfs_command_available`   |
 | FR1: zpool command available | `tests/environment/test_zfs_in_vm.py::TestZFSInstallation::test_zpool_command_available` |
-| FR2: zpool list succeeds | `tests/environment/test_zfs_in_vm.py::TestZFSKernelModules::test_zpool_list_succeeds` |
-| FR2: ZFS module loaded | `tests/environment/test_zfs_in_vm.py::TestZFSKernelModules::test_zfs_module_loaded` |
+| FR2: zpool list succeeds     | `tests/environment/test_zfs_in_vm.py::TestZFSKernelModules::test_zpool_list_succeeds`    |
+| FR2: ZFS module loaded       | `tests/environment/test_zfs_in_vm.py::TestZFSKernelModules::test_zfs_module_loaded`      |
 
 ## Tests Remaining in Specs
 
-| Test | Rationale |
-| ---- | --------- |
+| Test                       | Rationale                                                    |
+| -------------------------- | ------------------------------------------------------------ |
 | `test_zfs_installation.py` | Kept as reference; graduated version in `tests/environment/` |
 
 ## Changes Made During Graduation

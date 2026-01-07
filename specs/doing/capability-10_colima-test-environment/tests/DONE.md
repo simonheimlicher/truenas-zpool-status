@@ -14,29 +14,30 @@
 
 ## Verification Results
 
-| Tool     | Status | Details                   |
-|----------|--------|---------------------------|
-| pytest   | PASS   | 37/37 integration tests   |
+| Tool   | Status | Details                 |
+| ------ | ------ | ----------------------- |
+| pytest | PASS   | 37/37 integration tests |
 
 ## Features Completed
 
-| Feature | Status | Tests |
-|---------|--------|-------|
-| feature-32_colima-zfs-environment | DONE | 14 tests |
-| feature-54_pytest-fixtures | DONE | 11 tests |
-| feature-76_mock-rclone-remote | DONE | 1 + 10 tests |
+| Feature                           | Status | Tests        |
+| --------------------------------- | ------ | ------------ |
+| feature-32_colima-zfs-environment | DONE   | 14 tests     |
+| feature-54_pytest-fixtures        | DONE   | 11 tests     |
+| feature-76_mock-rclone-remote     | DONE   | 1 + 10 tests |
 
 ## Capability Integration Tests
 
-| Requirement | Test Location |
-|-------------|---------------|
+| Requirement                        | Test Location                                                                                              |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | EI1: ZFS operations work in Colima | `tests/integration/zfs/test_snapshot_operations.py`, `tests/integration/zfs/test_clone_tree_operations.py` |
-| EI2: rclone works with mock remote | `tests/integration/rclone/test_basic_sync.py` |
-| EI3: Full sync workflow testable | Both ZFS and rclone tests work together |
+| EI2: rclone works with mock remote | `tests/integration/rclone/test_basic_sync.py`                                                              |
+| EI3: Full sync workflow testable   | Both ZFS and rclone tests work together                                                                    |
 
 ## Environment Requirements
 
 Tests require:
+
 ```bash
 CLOUD_MIRROR_USE_VM=1 uv run --extra dev pytest tests/integration/ -v
 ```

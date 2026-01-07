@@ -12,9 +12,9 @@ This file marks the work item as complete and provides evidence that all require
 Tests that prove functional requirements are met. These have been moved from `work-item/tests/` to
 the production test suite.
 
-| Requirement | Test Location | Type |
-| ----------- | ------------- | ---- |
-| [Requirement text from work item] | `tests/unit/test_xxx.py::TestClass::test_name` | Unit |
+| Requirement                       | Test Location                                         | Type        |
+| --------------------------------- | ----------------------------------------------------- | ----------- |
+| [Requirement text from work item] | `tests/unit/test_xxx.py::TestClass::test_name`        | Unit        |
 | [Requirement text from work item] | `tests/integration/test_xxx.py::TestClass::test_name` | Integration |
 
 ### For Features and Capabilities
@@ -32,13 +32,13 @@ In addition to own tests, verify all children are complete:
 
 Evidence that coding standards and ADR requirements are met.
 
-| Standard | Evidence |
-| -------- | -------- |
-| Type annotations | All functions have type hints |
-| Modern syntax (`T \| None`) | No use of `Optional[T]` |
-| Pydantic at boundaries | `tests/integration/test_xxx.py::test_validates_response` |
-| Dependency injection | Constructor accepts optional dependencies |
-| Protocol compliance | Implements `MediaAdapter` per ADR-54 |
+| Standard                    | Evidence                                                 |
+| --------------------------- | -------------------------------------------------------- |
+| Type annotations            | All functions have type hints                            |
+| Modern syntax (`T \| None`) | No use of `Optional[T]`                                  |
+| Pydantic at boundaries      | `tests/integration/test_xxx.py::test_validates_response` |
+| Dependency injection        | Constructor accepts optional dependencies                |
+| Protocol compliance         | Implements `MediaAdapter` per ADR-54                     |
 
 ---
 

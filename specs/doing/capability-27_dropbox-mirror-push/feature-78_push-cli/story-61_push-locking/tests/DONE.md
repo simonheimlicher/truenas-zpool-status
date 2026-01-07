@@ -8,27 +8,27 @@
 
 ## Verification Results
 
-| Tool     | Status | Details              |
-|----------|--------|----------------------|
-| Mypy     | PASS   | 0 errors             |
-| Ruff     | PASS   | 0 violations         |
-| Semgrep  | PASS   | 0 findings           |
-| pytest   | PASS   | 28/28 tests, 67% coverage (module-level) |
+| Tool    | Status | Details                                  |
+| ------- | ------ | ---------------------------------------- |
+| Mypy    | PASS   | 0 errors                                 |
+| Ruff    | PASS   | 0 violations                             |
+| Semgrep | PASS   | 0 findings                               |
+| pytest  | PASS   | 28/28 tests, 67% coverage (module-level) |
 
 ## Requirements Coverage
 
-| Requirement | Test Class | Verification |
-|-------------|------------|--------------|
-| FR1: Lock acquired before workflow | `TestLockAcquisition` | Lock file created, contains PID |
-| FR2: Concurrent push fails immediately | `TestConcurrentLocking` | LockError raised with pool/path |
-| FR3: Lock released on completion | `TestLockRelease` | Released on success and exception |
-| FR4: Lock file location | `TestLockDirectorySelection` | XDG > /var/run > ~/.cache fallback |
+| Requirement                            | Test Class                   | Verification                       |
+| -------------------------------------- | ---------------------------- | ---------------------------------- |
+| FR1: Lock acquired before workflow     | `TestLockAcquisition`        | Lock file created, contains PID    |
+| FR2: Concurrent push fails immediately | `TestConcurrentLocking`      | LockError raised with pool/path    |
+| FR3: Lock released on completion       | `TestLockRelease`            | Released on success and exception  |
+| FR4: Lock file location                | `TestLockDirectorySelection` | XDG > /var/run > ~/.cache fallback |
 
 ## Graduated Tests
 
-| Test Location | Test Count |
-|---------------|------------|
-| `tests/integration/push/test_locking.py` | 28 tests |
+| Test Location                            | Test Count |
+| ---------------------------------------- | ---------- |
+| `tests/integration/push/test_locking.py` | 28 tests   |
 
 ### Test Classes
 

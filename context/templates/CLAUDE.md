@@ -25,7 +25,7 @@ templates/
 ## Quick Reference
 
 | Need to...                 | Use Template                               |
-|----------------------------|--------------------------------------------|
+| -------------------------- | ------------------------------------------ |
 | Capture technical vision   | `requirements/technical-change.trd.md`     |
 | Make architecture decision | `decisions/architectural-decision.adr.md`  |
 | Define E2E capability      | `work-items/capability-name.capability.md` |
@@ -39,7 +39,7 @@ templates/
 See [../1-structure.md](../1-structure.md) for properly calculating the work item numeric identifier `{NN}` using the binary space partitioning algorithm (BSP) and directory layout.
 
 | Type       | Pattern                   | Example                             |
-|------------|---------------------------|-------------------------------------|
+| ---------- | ------------------------- | ----------------------------------- |
 | Capability | `capability-{NN}_{slug}/` | `capability-54_multi-adapter-sync/` |
 | Feature    | `feature-{NN}_{slug}/`    | `feature-32_radarr-adapter/`        |
 | Story      | `story-{NN}_{slug}/`      | `story-27_media-item-dataclass/`    |

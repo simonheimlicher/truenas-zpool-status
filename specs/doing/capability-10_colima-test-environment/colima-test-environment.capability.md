@@ -44,6 +44,7 @@ AND cleanup occurs correctly after tests
 This capability provides the foundation for testing Capability-27 (Dropbox Push) and Capability-54 (Dropbox Mirror Pull). Without a working test environment, development of sync functionality cannot proceed with confidence.
 
 The test environment must:
+
 - Run on macOS development machines (Apple Silicon)
 - Provide real ZFS operations (not mocked)
 - Use mock rclone remotes (no actual Dropbox connection needed)

@@ -19,14 +19,14 @@
 
 ## Status of this Document: DoR Checklist
 
-| DoR checkbox            | Description                                                                                                          |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| [ ] **Outcome**         | **Technical Outcome:** [System capability or operational improvement that this feature will deliver]                 |
-| [ ] **Test Evidence**   | Complete technical integration test proving capability works with existing systems and improves operations           |
-| [ ] **Assumptions**     | Technical feasibility, existing system compatibility, operational patterns, infrastructure requirements              |
-| [ ] **Dependencies**    | Existing system capabilities, third-party services, infrastructure components, coordination requirements             |
-| [ ] **Pre-Mortem**      | Integration complexity, performance bottlenecks, operational risks, maintenance overhead                             |
-| [ ] **Deployment Plan** | Rollout strategy, operational procedures, monitoring setup, rollback procedures                                      |
+| DoR checkbox            | Description                                                                                                |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [ ] **Outcome**         | **Technical Outcome:** [System capability or operational improvement that this feature will deliver]       |
+| [ ] **Test Evidence**   | Complete technical integration test proving capability works with existing systems and improves operations |
+| [ ] **Assumptions**     | Technical feasibility, existing system compatibility, operational patterns, infrastructure requirements    |
+| [ ] **Dependencies**    | Existing system capabilities, third-party services, infrastructure components, coordination requirements   |
+| [ ] **Pre-Mortem**      | Integration complexity, performance bottlenecks, operational risks, maintenance overhead                   |
+| [ ] **Deployment Plan** | Rollout strategy, operational procedures, monitoring setup, rollback procedures                            |
 
 ## Problem Statement
 
@@ -90,6 +90,7 @@ Complete technical integration test that provides irrefutable evidence the Techn
 import pytest
 from imexport.models.media import MediaItem, MediaIds, MediaType
 from imexport.adapters.radarr import RadarrAdapter
+
 
 class TestTechnicalCapability:
     """Feature: [Technical Capability Name]"""

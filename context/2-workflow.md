@@ -104,11 +104,11 @@ Trade-off: Extra disk space and cleanup complexity enables correct snapshot trav
 
 ADRs can live at three levels:
 
-| Level          | Location                   | Example                                      |
-| -------------- | -------------------------- | -------------------------------------------- |
-| **Project**    | `specs/decisions/`         | "Use Colima VM for ZFS testing on macOS"     |
-| **Capability** | `capability-NN/decisions/` | "Clone tree approach for snapshot sync"      |
-| **Feature**    | `feature-NN/decisions/`    | "Use rclone sync with --checksum flag"       |
+| Level          | Location                   | Example                                  |
+| -------------- | -------------------------- | ---------------------------------------- |
+| **Project**    | `specs/decisions/`         | "Use Colima VM for ZFS testing on macOS" |
+| **Capability** | `capability-NN/decisions/` | "Clone tree approach for snapshot sync"  |
+| **Feature**    | `feature-NN/decisions/`    | "Use rclone sync with --checksum flag"   |
 
 Narrower scope inherits from broader. Stories don't have ADRs—they inherit from their parent feature
 and capability.
@@ -206,16 +206,16 @@ Feature: Rclone Push Sync
 
 **Stories are ORDERED. Each builds on the previous.**
 
-| Order | Story                      | Enables                    | Test Status              |
-| ----- | -------------------------- | -------------------------- | ------------------------ |
-| 1     | Colima VM setup            | VM runs on macOS           | Compiles                 |
-| 2     | ZFS installation in VM     | ZFS commands available     | Compiles                 |
-| 3     | Test pool creation         | testpool exists            | 🟢 Colima feature        |
-| 4     | create_recursive_snapshot  | Snapshots created          | Compiles                 |
-| 5     | build_clone_tree           | Clone tree mounted         | 🟢 Clone tree feature    |
-| 6     | rclone_sync                | Files synced to remote     | 🟢 Rclone feature        |
-| 7     | cleanup_clones             | Clones destroyed           | Compiles                 |
-| 8     | CLI integration            | Full push flow             | 🟢 **E2E capability**    |
+| Order | Story                     | Enables                | Test Status           |
+| ----- | ------------------------- | ---------------------- | --------------------- |
+| 1     | Colima VM setup           | VM runs on macOS       | Compiles              |
+| 2     | ZFS installation in VM    | ZFS commands available | Compiles              |
+| 3     | Test pool creation        | testpool exists        | 🟢 Colima feature     |
+| 4     | create_recursive_snapshot | Snapshots created      | Compiles              |
+| 5     | build_clone_tree          | Clone tree mounted     | 🟢 Clone tree feature |
+| 6     | rclone_sync               | Files synced to remote | 🟢 Rclone feature     |
+| 7     | cleanup_clones            | Clones destroyed       | Compiles              |
+| 8     | CLI integration           | Full push flow         | 🟢 **E2E capability** |
 
 **Each story's value = moving tests from RED to GREEN.**
 
@@ -400,15 +400,15 @@ Tests should be ordered to fail fast on environment issues:
 ```python
 # Good ordering - trivial first
 class TestColima:
-    def test_colima_command_available(self):     # 1. Is tool installed?
+    def test_colima_command_available(self):  # 1. Is tool installed?
         ...
-    def test_colima_status_works(self):          # 2. Does basic command work?
+    def test_colima_status_works(self):  # 2. Does basic command work?
         ...
-    def test_vm_running(self):                   # 3. Is VM running?
+    def test_vm_running(self):  # 3. Is VM running?
         ...
-    def test_can_ssh_to_vm(self):                # 4. Can we connect?
+    def test_can_ssh_to_vm(self):  # 4. Can we connect?
         ...
-    def test_can_execute_command(self):          # 5. Does execution work?
+    def test_can_execute_command(self):  # 5. Does execution work?
         ...
 ```
 
@@ -419,15 +419,15 @@ class TestColima:
 
 ## Graduated Tests
 
-| Requirement | Graduated To |
-| ----------- | ------------ |
-| FR1: ...    | `tests/environment/test_xxx.py::TestClass::test_name` |
+| Requirement | Graduated To                                           |
+| ----------- | ------------------------------------------------------ |
+| FR1: ...    | `tests/environment/test_xxx.py::TestClass::test_name`  |
 | FR2: ...    | `tests/environment/test_xxx.py::TestClass::test_other` |
 
 ## Tests Remaining in Specs
 
-| Test | Rationale |
-| ---- | --------- |
+| Test           | Rationale           |
+| -------------- | ------------------- |
 | (none or list) | (why not graduated) |
 
 ## Verification

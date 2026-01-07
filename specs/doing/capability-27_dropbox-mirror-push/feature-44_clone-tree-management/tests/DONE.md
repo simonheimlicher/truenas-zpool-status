@@ -8,19 +8,19 @@
 
 ## Stories Completed
 
-| Story | Status | DONE.md |
-|-------|--------|---------|
-| story-32_create-clone | DONE | [DONE.md](../story-32_create-clone/tests/DONE.md) |
-| story-54_clone-tree-creation | DONE | [DONE.md](../story-54_clone-tree-creation/tests/DONE.md) |
-| story-76_clone-tree-destruction | DONE | [DONE.md](../story-76_clone-tree-destruction/tests/DONE.md) |
+| Story                           | Status | DONE.md                                                     |
+| ------------------------------- | ------ | ----------------------------------------------------------- |
+| story-32_create-clone           | DONE   | [DONE.md](../story-32_create-clone/tests/DONE.md)           |
+| story-54_clone-tree-creation    | DONE   | [DONE.md](../story-54_clone-tree-creation/tests/DONE.md)    |
+| story-76_clone-tree-destruction | DONE   | [DONE.md](../story-76_clone-tree-destruction/tests/DONE.md) |
 
 ## Verification Results
 
-| Tool     | Status | Details              |
-|----------|--------|----------------------|
-| Mypy     | PASS   | 0 errors on cloud_mirror/zfs.py |
-| Ruff     | PASS   | 0 violations         |
-| pytest   | PASS   | 18/18 tests, 73% coverage |
+| Tool   | Status | Details                         |
+| ------ | ------ | ------------------------------- |
+| Mypy   | PASS   | 0 errors on cloud_mirror/zfs.py |
+| Ruff   | PASS   | 0 violations                    |
+| pytest | PASS   | 18/18 tests, 73% coverage       |
 
 ## Test Summary
 

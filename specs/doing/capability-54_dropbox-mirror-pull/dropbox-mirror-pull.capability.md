@@ -61,6 +61,7 @@ THEN local dataset has:
 ## System Integration
 
 This capability extends `cloud-mirror.py` to support bidirectional sync. It depends on:
+
 - Capability-10 (Docker Test Environment) for running ZFS integration tests
 - Capability-27 (Dropbox Push) for shared infrastructure (validation, rclone, CLI framework)
 

@@ -16,10 +16,12 @@ def test_rclone_sync_copies_files():
     subprocess.run(["rclone", "sync", src, dest])
     assert dest_has_files()  # This tests rclone, not our code
 
+
 # ❌ BAD - testing that ZFS commands work
 def test_zfs_create_makes_dataset():
     subprocess.run(["zfs", "create", "testpool/data"])
     assert dataset_exists()  # This tests ZFS, not our code
+
 
 # ✅ GOOD - testing OUR code that uses rclone
 def test_sync_module_handles_rclone_failure():
@@ -35,9 +37,11 @@ def test_sync_module_handles_rclone_failure():
 def test_config_file_exists():
     assert Path("rclone-test.conf").exists()
 
+
 # ❌ BAD - testing fixture internals
 def test_fixture_returns_path():
     assert test_remote.startswith("testremote:")
+
 
 # ✅ GOOD - one smoke test that fails loudly and points fingers
 def test_rclone_mock_remote_available():
@@ -60,9 +64,10 @@ def test_filter_returns_only_missing_movies():
     result = apply_filter(movies, "!hasFile")
     assert result == [Movie(title="B", has_file=False)]
 
+
 # Bad - tests implementation
 def test_filter_calls_internal_method():
-    with patch.object(Filter, '_check_predicate') as mock:
+    with patch.object(Filter, "_check_predicate") as mock:
         apply_filter(movies, "!hasFile")
         mock.assert_called_once()  # Who cares?
 ```
@@ -124,9 +129,9 @@ def test_parse_filter_hasFile():
 # Integration test - mocked HTTP
 @respx.mock
 def test_radarr_adapter_fetches_movies(respx_mock):
-    respx_mock.get("/api/v3/movie").respond(json=[
-        {"title": "Movie A", "year": 2024, "hasFile": True}
-    ])
+    respx_mock.get("/api/v3/movie").respond(
+        json=[{"title": "Movie A", "year": 2024, "hasFile": True}]
+    )
 
     adapter = RadarrAdapter(base_url="http://radarr", api_key="test")
     movies = adapter.read()
@@ -170,9 +175,10 @@ def test_adapter_handles_api_error(respx_mock):
     with pytest.raises(httpx.HTTPStatusError):
         adapter.read()
 
+
 # Bad - mock internal implementation
 def test_adapter_handles_api_error():
-    with patch.object(RadarrAdapter, '_parse_response'):  # Don't mock internals
+    with patch.object(RadarrAdapter, "_parse_response"):  # Don't mock internals
         ...
 ```
 
@@ -182,10 +188,12 @@ def test_adapter_handles_api_error():
 import respx
 import httpx
 
+
 @respx.mock
 def test_with_decorator(respx_mock):
     respx_mock.get("https://api.example.com/movies").respond(json=[...])
     # test code
+
 
 def test_with_context_manager():
     with respx.mock as mock:
@@ -201,7 +209,7 @@ def test_retry_on_connection_error(respx_mock):
     route = respx_mock.get("/api/v3/movie")
     route.side_effect = [
         httpx.ConnectError("Connection refused"),
-        httpx.Response(200, json=[])
+        httpx.Response(200, json=[]),
     ]
 
     adapter = RadarrAdapter(...)
@@ -224,10 +232,12 @@ def sample_movies():
         Movie(title="Movie B", year=2023, has_file=False),
     ]
 
+
 @pytest.fixture
 def mock_radarr_api():
     with respx.mock(base_url="http://radarr:7878") as mock:
         yield mock
+
 
 def test_filter_movies(sample_movies):
     result = apply_filter(sample_movies, "year>=2024")
@@ -238,16 +248,15 @@ def test_filter_movies(sample_movies):
 
 ```python
 @pytest.fixture(scope="function")  # Default - new for each test
-def mock_api():
-    ...
+def mock_api(): ...
 
-@pytest.fixture(scope="module")    # Shared across tests in file
-def expensive_setup():
-    ...
 
-@pytest.fixture(scope="session")   # Shared across all tests
-def database_connection():
-    ...
+@pytest.fixture(scope="module")  # Shared across tests in file
+def expensive_setup(): ...
+
+
+@pytest.fixture(scope="session")  # Shared across all tests
+def database_connection(): ...
 ```
 
 ---
@@ -276,6 +285,7 @@ def test_radarr_adapter_reads_all_movies():
     """Feature: Radarr Adapter"""
     # Component integration test
     ...
+
 
 def test_radarr_adapter_handles_pagination():
     """Feature: Radarr Adapter"""
@@ -341,12 +351,16 @@ assert "year" in str(exc_info.value)
 # Approximate comparisons
 assert result.duration == pytest.approx(1.5, rel=0.1)
 
+
 # Parametrized tests
-@pytest.mark.parametrize("filter_str,expected_count", [
-    ("hasFile", 2),
-    ("!hasFile", 3),
-    ("year>=2024", 1),
-])
+@pytest.mark.parametrize(
+    "filter_str,expected_count",
+    [
+        ("hasFile", 2),
+        ("!hasFile", 3),
+        ("year>=2024", 1),
+    ],
+)
 def test_filter_variations(sample_movies, filter_str, expected_count):
     result = apply_filter(sample_movies, filter_str)
     assert len(result) == expected_count
@@ -406,6 +420,7 @@ class TestCsvFormatter:
     def test_outputs_data_rows(self): ...
     def test_handles_none_values(self): ...
 
+
 class TestJsonFormatter:
     """Tests for JSON output requirements."""
 
@@ -434,6 +449,7 @@ def test_media_ids_match_by_any_common_id(self):
 def test_it_works(): ...
 def test_basic(): ...
 def test_feature_1(): ...
+
 
 # Bad - tests implementation, not requirement
 def test_calls_internal_method(): ...

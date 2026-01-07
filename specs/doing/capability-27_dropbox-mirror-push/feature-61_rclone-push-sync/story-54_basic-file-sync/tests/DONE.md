@@ -8,31 +8,31 @@
 
 ## Verification Results
 
-| Tool     | Status | Details              |
-|----------|--------|----------------------|
-| Mypy     | PASS   | 0 errors (strict)    |
-| Ruff     | PASS   | 0 violations         |
-| Semgrep  | PASS   | 0 findings           |
-| pytest   | PASS   | 60/60 tests, 81% coverage |
+| Tool    | Status | Details                   |
+| ------- | ------ | ------------------------- |
+| Mypy    | PASS   | 0 errors (strict)         |
+| Ruff    | PASS   | 0 violations              |
+| Semgrep | PASS   | 0 findings                |
+| pytest  | PASS   | 60/60 tests, 81% coverage |
 
 ## Graduated Tests
 
-| Requirement | Test Location |
-|-------------|---------------|
-| FR1: Sync files to remote | `tests/integration/rclone/test_basic_sync.py::TestTypicalSync::test_simple_file_syncs` |
-| FR1: Directory structure preserved | `tests/integration/rclone/test_basic_sync.py::TestTypicalSync::test_directory_structure_preserved` |
-| FR2: Symlinks handled | `tests/integration/rclone/test_basic_sync.py::TestTypicalSync::test_symlink_handled_with_links_flag` |
-| FR3: Error handling | `tests/integration/rclone/test_basic_sync.py::TestErrorHandling::test_invalid_remote_raises_error` |
-| FR1 Level 3: Real Dropbox | `tests/integration/rclone/test_dropbox_sync.py::TestDropboxSync::test_files_sync_to_dropbox` |
+| Requirement                        | Test Location                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| FR1: Sync files to remote          | `tests/integration/rclone/test_basic_sync.py::TestTypicalSync::test_simple_file_syncs`                       |
+| FR1: Directory structure preserved | `tests/integration/rclone/test_basic_sync.py::TestTypicalSync::test_directory_structure_preserved`           |
+| FR2: Symlinks handled              | `tests/integration/rclone/test_basic_sync.py::TestTypicalSync::test_symlink_handled_with_links_flag`         |
+| FR3: Error handling                | `tests/integration/rclone/test_basic_sync.py::TestErrorHandling::test_invalid_remote_raises_error`           |
+| FR1 Level 3: Real Dropbox          | `tests/integration/rclone/test_dropbox_sync.py::TestDropboxSync::test_files_sync_to_dropbox`                 |
 | FR2 Level 3: Real Dropbox symlinks | `tests/integration/rclone/test_dropbox_sync.py::TestDropboxSync::test_symlinks_become_rclonelink_on_dropbox` |
 
 ## Implementation Files
 
-| File | Description |
-|------|-------------|
-| `cloud_mirror/rclone.py` | Added `run_rclone_sync()`, `SyncResult`, `RcloneSyncError` |
-| `tests/integration/rclone/test_basic_sync.py` | Level 2 tests (10 tests, local backend) |
-| `tests/integration/rclone/test_dropbox_sync.py` | Level 3 tests (7 tests, real Dropbox) |
+| File                                            | Description                                                |
+| ----------------------------------------------- | ---------------------------------------------------------- |
+| `cloud_mirror/rclone.py`                        | Added `run_rclone_sync()`, `SyncResult`, `RcloneSyncError` |
+| `tests/integration/rclone/test_basic_sync.py`   | Level 2 tests (10 tests, local backend)                    |
+| `tests/integration/rclone/test_dropbox_sync.py` | Level 3 tests (7 tests, real Dropbox)                      |
 
 ## Spec Compliance
 

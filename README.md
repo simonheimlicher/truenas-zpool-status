@@ -39,10 +39,10 @@ cloud_mirror/
 
 The `sync` command auto-detects direction based on argument format:
 
-| First Arg | Second Arg | Direction |
-|-----------|------------|-----------|
-| `pool/data` | `dropbox:backup` | **PUSH** (local → remote) |
-| `dropbox:backup` | `pool/data` | **PULL** (remote → local) |
+| First Arg        | Second Arg       | Direction                 |
+| ---------------- | ---------------- | ------------------------- |
+| `pool/data`      | `dropbox:backup` | **PUSH** (local → remote) |
+| `dropbox:backup` | `pool/data`      | **PULL** (remote → local) |
 
 Detection rule: rclone remotes contain `:` before any `/`; ZFS datasets have `/` before any `:` (e.g., `tank/vm:disk0`).
 
@@ -108,11 +108,11 @@ tests/
 
 ### Test Levels
 
-| Level | Marker | Requires | Speed |
-|-------|--------|----------|-------|
-| Unit | (none) | Nothing | Fast |
-| VM Integration | `@pytest.mark.vm_required` | Colima VM with ZFS | Medium |
-| Network Integration | `@pytest.mark.internet_required` | Dropbox token | Slow |
+| Level               | Marker                           | Requires           | Speed  |
+| ------------------- | -------------------------------- | ------------------ | ------ |
+| Unit                | (none)                           | Nothing            | Fast   |
+| VM Integration      | `@pytest.mark.vm_required`       | Colima VM with ZFS | Medium |
+| Network Integration | `@pytest.mark.internet_required` | Dropbox token      | Slow   |
 
 ### Development Environment (macOS)
 
@@ -251,18 +251,18 @@ python3 -m cloud_mirror sync dropbox:Backup apps/config \
 
 ### Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--config PATH` | None | Path to rclone config file |
-| `--transfers N` | 64 | Parallel file transfers |
-| `--tpslimit N` | 12 | Transactions per second limit |
-| `--dry-run` | False | Trial run, no changes |
-| `-v, -vv, -vvv` | 0 | Verbosity level |
-| `--keep-versions N` | 0 | Keep N old versions (push) |
-| `--keep-snapshot` | False | Keep snapshot after sync (push) |
-| `--keep-clone` | False | Keep clone tree after sync (push) |
-| `--keep-pre-snapshot` | False | Keep pre-pull snapshot (pull) |
-| `--no-pre-snapshot` | False | Skip pre-pull snapshot (pull) |
+| Option                | Default | Description                       |
+| --------------------- | ------- | --------------------------------- |
+| `--config PATH`       | None    | Path to rclone config file        |
+| `--transfers N`       | 64      | Parallel file transfers           |
+| `--tpslimit N`        | 12      | Transactions per second limit     |
+| `--dry-run`           | False   | Trial run, no changes             |
+| `-v, -vv, -vvv`       | 0       | Verbosity level                   |
+| `--keep-versions N`   | 0       | Keep N old versions (push)        |
+| `--keep-snapshot`     | False   | Keep snapshot after sync (push)   |
+| `--keep-clone`        | False   | Keep clone tree after sync (push) |
+| `--keep-pre-snapshot` | False   | Keep pre-pull snapshot (pull)     |
+| `--no-pre-snapshot`   | False   | Skip pre-pull snapshot (pull)     |
 
 ## Cron Job Setup for TrueNAS SCALE 25.10
 
@@ -270,15 +270,15 @@ python3 -m cloud_mirror sync dropbox:Backup apps/config \
 
 Navigate to **System > Advanced Settings > Cron Jobs > Add**
 
-| Field | Value |
-|-------|-------|
-| **Description** | Cloud Sync: apps/config to Dropbox |
-| **Command** | `python3 -m cloud_mirror push apps/config dropbox:TrueNAS-Backup/apps-config --config /mnt/apps/cloud-mirror/rclone.conf` |
-| **Run As User** | root |
-| **Schedule** | Custom: `0 3 * * *` (3:00 AM daily) |
-| **Hide Standard Output** | Checked |
-| **Hide Standard Error** | Unchecked (receive error emails) |
-| **Enabled** | Checked |
+| Field                    | Value                                                                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| **Description**          | Cloud Sync: apps/config to Dropbox                                                                                        |
+| **Command**              | `python3 -m cloud_mirror push apps/config dropbox:TrueNAS-Backup/apps-config --config /mnt/apps/cloud-mirror/rclone.conf` |
+| **Run As User**          | root                                                                                                                      |
+| **Schedule**             | Custom: `0 3 * * *` (3:00 AM daily)                                                                                       |
+| **Hide Standard Output** | Checked                                                                                                                   |
+| **Hide Standard Error**  | Unchecked (receive error emails)                                                                                          |
+| **Enabled**              | Checked                                                                                                                   |
 
 ### Via CLI
 
@@ -307,10 +307,10 @@ midclt call task.cron_job.create '{
 
 Create separate cron jobs for each dataset:
 
-| Dataset | Schedule | Time |
-|---------|----------|------|
-| apps/config | `0 3 * * *` | 3:00 AM |
-| apps/data | `0 4 * * *` | 4:00 AM |
+| Dataset      | Schedule    | Time    |
+| ------------ | ----------- | ------- |
+| apps/config  | `0 3 * * *` | 3:00 AM |
+| apps/data    | `0 4 * * *` | 4:00 AM |
 | media/photos | `0 5 * * *` | 5:00 AM |
 
 ### TrueNAS SCALE 25.10 Important Notes
@@ -382,6 +382,7 @@ Verify root has proper RBAC roles:
 ### This is file-level backup, not ZFS replication
 
 Dropbox will not preserve:
+
 - ZFS properties
 - ACLs and extended attributes
 - Dataset boundaries
@@ -404,5 +405,6 @@ MIT
 ---
 
 **Sources:**
+
 - [Managing Cron Jobs - TrueNAS Documentation](https://www.truenas.com/docs/scale/scaletutorials/systemsettings/advanced/managecronjobsscale/)
 - [TrueNAS SCALE 25.10 Version Notes](https://www.truenas.com/docs/scale/25.10/gettingstarted/versionnotes/)

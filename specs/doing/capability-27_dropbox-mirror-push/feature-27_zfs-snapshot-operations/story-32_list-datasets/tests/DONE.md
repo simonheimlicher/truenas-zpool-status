@@ -2,11 +2,11 @@
 
 ## Graduated Tests
 
-| Requirement | Graduated To |
-| ----------- | ------------ |
-| FR1: Enumerate all datasets under root | `tests/integration/zfs/test_snapshot_operations.py::TestListDatasetsRecursive::test_lists_root_and_children` |
-| FR1: Root dataset is first | `tests/integration/zfs/test_snapshot_operations.py::TestListDatasetsRecursive::test_root_is_first` |
-| FR2: Handle single dataset | `tests/integration/zfs/test_snapshot_operations.py::TestListDatasetsRecursive::test_single_dataset_no_children` |
+| Requirement                            | Graduated To                                                                                                    |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| FR1: Enumerate all datasets under root | `tests/integration/zfs/test_snapshot_operations.py::TestListDatasetsRecursive::test_lists_root_and_children`    |
+| FR1: Root dataset is first             | `tests/integration/zfs/test_snapshot_operations.py::TestListDatasetsRecursive::test_root_is_first`              |
+| FR2: Handle single dataset             | `tests/integration/zfs/test_snapshot_operations.py::TestListDatasetsRecursive::test_single_dataset_no_children` |
 
 ## Tests Remaining in Specs
 

@@ -29,6 +29,7 @@ Only run ZFS tests on actual TrueNAS or a remote Linux server. Local development
 ## Rationale
 
 Colima provides the best balance of:
+
 - **Real ZFS operations**: Ubuntu in Colima has full ZFS kernel module support
 - **Docker compatibility**: Colima is a drop-in Docker replacement; `docker` and `docker compose` commands work unchanged
 - **Local development**: Tests run on the developer's Mac without remote infrastructure

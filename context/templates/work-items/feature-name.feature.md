@@ -8,14 +8,14 @@
 
 ### FI1: [Cross-story integration test]
 
-GIVEN [multiple stories are implemented]  
-WHEN [user/system performs feature-level action]  
+GIVEN [multiple stories are implemented]\
+WHEN [user/system performs feature-level action]\
 THEN [complete feature value is delivered]
 
 ### FI2: [Additional integration test if needed]
 
-GIVEN [feature prerequisites]  
-WHEN [feature interaction]  
+GIVEN [feature prerequisites]\
+WHEN [feature interaction]\
 THEN [expected integrated behavior]
 
 ## Capability Contribution

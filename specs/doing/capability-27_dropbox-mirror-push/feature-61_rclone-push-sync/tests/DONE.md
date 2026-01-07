@@ -8,31 +8,31 @@
 
 ## Verification Results
 
-| Tool     | Status | Details                    |
-|----------|--------|----------------------------|
-| Mypy     | PASS   | 0 errors (strict)          |
-| Ruff     | PASS   | 0 violations               |
-| Semgrep  | PASS   | 0 findings                 |
-| pytest   | PASS   | 79/79 tests, 80% coverage  |
+| Tool    | Status | Details                   |
+| ------- | ------ | ------------------------- |
+| Mypy    | PASS   | 0 errors (strict)         |
+| Ruff    | PASS   | 0 violations              |
+| Semgrep | PASS   | 0 findings                |
+| pytest  | PASS   | 79/79 tests, 80% coverage |
 
 ## Stories Completed
 
-| Story | Status | Tests |
-|-------|--------|-------|
-| story-32_rclone-command-building | DONE | 50 unit tests |
-| story-54_basic-file-sync | DONE | 10 integration tests |
-| story-76_version-backup | DONE | 19 integration tests + 2 Level 3 |
+| Story                            | Status | Tests                            |
+| -------------------------------- | ------ | -------------------------------- |
+| story-32_rclone-command-building | DONE   | 50 unit tests                    |
+| story-54_basic-file-sync         | DONE   | 10 integration tests             |
+| story-76_version-backup          | DONE   | 19 integration tests + 2 Level 3 |
 
 ## Feature Integration Tests
 
-| Requirement | Test Location |
-|-------------|---------------|
-| FI1: Basic sync | `tests/integration/rclone/test_basic_sync.py::TestTypicalSync` |
-| FI2: Symlinks | `tests/integration/rclone/test_basic_sync.py::test_symlink_handled_with_links_flag` |
-| FI3: Version backup | `tests/integration/rclone/test_dropbox_sync.py::TestDropboxVersionBackup::test_version_backup_works_on_dropbox` |
-| FI4: Old versions cleanup | `tests/integration/rclone/test_dropbox_sync.py::TestDropboxVersionBackup::test_cleanup_works_on_dropbox` |
-| FI5: Rate limiting | `tests/integration/rclone/test_dropbox_sync.py::TestDropboxRateLimits::test_tpslimit_prevents_rate_errors` |
-| FI6: Output filtering | `tests/unit/rclone/test_command_building.py::TestFilterOutputTypical` |
+| Requirement               | Test Location                                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| FI1: Basic sync           | `tests/integration/rclone/test_basic_sync.py::TestTypicalSync`                                                  |
+| FI2: Symlinks             | `tests/integration/rclone/test_basic_sync.py::test_symlink_handled_with_links_flag`                             |
+| FI3: Version backup       | `tests/integration/rclone/test_dropbox_sync.py::TestDropboxVersionBackup::test_version_backup_works_on_dropbox` |
+| FI4: Old versions cleanup | `tests/integration/rclone/test_dropbox_sync.py::TestDropboxVersionBackup::test_cleanup_works_on_dropbox`        |
+| FI5: Rate limiting        | `tests/integration/rclone/test_dropbox_sync.py::TestDropboxRateLimits::test_tpslimit_prevents_rate_errors`      |
+| FI6: Output filtering     | `tests/unit/rclone/test_command_building.py::TestFilterOutputTypical`                                           |
 
 ## ADR Compliance
 
@@ -46,13 +46,13 @@ Per ADR-001 (rclone-sync-testing-strategy.md):
 
 ## Implementation Files
 
-| File | Description |
-|------|-------------|
-| `cloud_mirror/rclone.py` | Main implementation (~250 lines) |
-| `tests/unit/rclone/test_command_building.py` | Level 1 tests |
-| `tests/integration/rclone/test_basic_sync.py` | Level 2 tests |
-| `tests/integration/rclone/test_version_backup.py` | Level 2 version tests |
-| `tests/integration/rclone/test_dropbox_sync.py` | Level 3 Dropbox tests |
+| File                                              | Description                      |
+| ------------------------------------------------- | -------------------------------- |
+| `cloud_mirror/rclone.py`                          | Main implementation (~250 lines) |
+| `tests/unit/rclone/test_command_building.py`      | Level 1 tests                    |
+| `tests/integration/rclone/test_basic_sync.py`     | Level 2 tests                    |
+| `tests/integration/rclone/test_version_backup.py` | Level 2 version tests            |
+| `tests/integration/rclone/test_dropbox_sync.py`   | Level 3 Dropbox tests            |
 
 ## Bug Fixed During Review
 

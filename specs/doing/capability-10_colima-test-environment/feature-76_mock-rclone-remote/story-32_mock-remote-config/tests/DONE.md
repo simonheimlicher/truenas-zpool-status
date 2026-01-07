@@ -2,8 +2,8 @@
 
 ## Graduated Tests
 
-| Requirement | Graduated To |
-| ----------- | ------------ |
+| Requirement                       | Graduated To                                                          |
+| --------------------------------- | --------------------------------------------------------------------- |
 | FR1: Mock rclone remote available | `tests/environment/test_rclone.py::test_rclone_mock_remote_available` |
 
 ## Tests Remaining in Specs

@@ -8,12 +8,11 @@ All functions, methods, and class attributes must have type annotations:
 
 ```python
 # Good
-def fetch_movies(base_url: str, api_key: str) -> list[Movie]:
-    ...
+def fetch_movies(base_url: str, api_key: str) -> list[Movie]: ...
+
 
 # Bad - missing annotations
-def fetch_movies(base_url, api_key):
-    ...
+def fetch_movies(base_url, api_key): ...
 ```
 
 ### Modern Syntax
@@ -24,13 +23,14 @@ def fetch_movies(base_url, api_key):
 
 ```python
 # Good
-def get_movie(id: int) -> Movie | None:
-    ...
+def get_movie(id: int) -> Movie | None: ...
+
 
 # Bad - old syntax
 from typing import Optional
-def get_movie(id: int) -> Optional[Movie]:
-    ...
+
+
+def get_movie(id: int) -> Optional[Movie]: ...
 ```
 
 ### Protocol for Interfaces
@@ -39,6 +39,7 @@ Use `typing.Protocol` for interfaces, not `abc.ABC`:
 
 ```python
 from typing import Protocol
+
 
 class MediaAdapter(Protocol):
     """Any class with these methods satisfies the interface."""
@@ -64,10 +65,12 @@ External data (API responses, user input, file contents) must be validated befor
 ```python
 from pydantic import BaseModel, TypeAdapter
 
+
 class Movie(BaseModel):
     title: str
     year: int
     tmdb_id: int | None = None
+
 
 # Validate API response
 response = client.get("/api/v3/movie")
@@ -83,15 +86,16 @@ movies = TypeAdapter(list[Movie]).validate_python(response.json())
 ```python
 from pydantic import BaseModel, field_validator
 
+
 class Movie(BaseModel):
     title: str
     year: int
 
-    @field_validator('year')
+    @field_validator("year")
     @classmethod
     def year_reasonable(cls, v: int) -> int:
         if v < 1888 or v > 2100:
-            raise ValueError('year must be between 1888 and 2100')
+            raise ValueError("year must be between 1888 and 2100")
         return v
 ```
 
@@ -120,6 +124,7 @@ Classes should accept their dependencies, not create them:
 class RadarrAdapter:
     def __init__(self, client: httpx.Client | None = None):
         self._client = client or httpx.Client()
+
 
 # Bad - hard-coded dependency
 class RadarrAdapter:
@@ -153,6 +158,7 @@ def fetch_movies(self) -> list[Movie]:
     response = self._client.get("/api/v3/movie")
     response.raise_for_status()  # Propagates HTTPStatusError
     return self._parse_response(response)
+
 
 # Bad - swallows errors
 def fetch_movies(self) -> list[Movie]:
@@ -211,9 +217,7 @@ Make dependencies and behavior explicit:
 ```python
 # Good - explicit configuration
 adapter = RadarrAdapter(
-    base_url="http://radarr:7878",
-    api_key=os.environ["RADARR_API_KEY"],
-    timeout=30.0
+    base_url="http://radarr:7878", api_key=os.environ["RADARR_API_KEY"], timeout=30.0
 )
 
 # Bad - hidden configuration

@@ -8,13 +8,13 @@ operations.
 
 ## Functional Requirements Covered
 
-| FR  | Description                              | Status |
-| --- | ---------------------------------------- | ------ |
-| FR1 | CLI invokes orchestrator                 | DONE   |
-| FR2 | Dry run mode                             | DONE   |
-| FR3 | Verbose output levels                    | DONE   |
-| FR4 | User-friendly error messages             | DONE   |
-| FR5 | Config file option                       | DONE   |
+| FR  | Description                  | Status |
+| --- | ---------------------------- | ------ |
+| FR1 | CLI invokes orchestrator     | DONE   |
+| FR2 | Dry run mode                 | DONE   |
+| FR3 | Verbose output levels        | DONE   |
+| FR4 | User-friendly error messages | DONE   |
+| FR5 | Config file option           | DONE   |
 
 ## Implementation
 
@@ -56,6 +56,7 @@ operations.
 ## Architecture Notes
 
 The integration tests are limited because:
+
 - ZFS runs inside Colima VM (development environment)
 - rclone runs on host
 - Clone mountpoint is inside VM, not accessible from host

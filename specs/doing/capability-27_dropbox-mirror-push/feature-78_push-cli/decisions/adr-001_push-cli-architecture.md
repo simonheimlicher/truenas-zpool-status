@@ -23,6 +23,7 @@ Orchestrator class that accepts operations as injected dependencies, enabling is
 **We will use Option 3: Dependency-injected orchestrator.**
 
 The orchestrator receives operations (validate, snapshot, clone, sync, cleanup) as injectable dependencies. This enables:
+
 - Level 1 testing of orchestration logic with fake operations
 - Level 2 testing with real ZFS/rclone operations
 - Clear separation of concerns
@@ -30,6 +31,7 @@ The orchestrator receives operations (validate, snapshot, clone, sync, cleanup) 
 ## Rationale
 
 The push workflow has 9 steps that must execute in order with cleanup on failure:
+
 1. Validate dataset exists
 2. Validate rclone config and remote
 3. List datasets recursively
@@ -89,17 +91,22 @@ class PushOperations(Protocol):
 class PushError(Exception):
     """Base exception for push failures."""
 
+
 class ValidationError(PushError):
     """Dataset or remote validation failed."""
+
 
 class SnapshotError(PushError):
     """Snapshot creation/destruction failed."""
 
+
 class CloneError(PushError):
     """Clone tree creation/destruction failed."""
 
+
 class SyncError(PushError):
     """Rclone sync failed."""
+
 
 class LockError(PushError):
     """Could not acquire lock (concurrent operation)."""
@@ -109,13 +116,13 @@ class LockError(PushError):
 
 ### Level Assignments
 
-| Component | Level | Justification |
-|-----------|-------|---------------|
-| Argument parsing | 1 (Unit) | Pure argparse logic, no external deps |
-| Orchestrator logic | 1 (Unit) | DI allows fake operations |
-| Lock acquisition | 2 (VM) | Needs real filesystem |
-| Full workflow | 2 (VM) | Real ZFS + local rclone backend |
-| Dropbox sync | 3 (Internet) | Real Dropbox for E2E |
+| Component          | Level        | Justification                         |
+| ------------------ | ------------ | ------------------------------------- |
+| Argument parsing   | 1 (Unit)     | Pure argparse logic, no external deps |
+| Orchestrator logic | 1 (Unit)     | DI allows fake operations             |
+| Lock acquisition   | 2 (VM)       | Needs real filesystem                 |
+| Full workflow      | 2 (VM)       | Real ZFS + local rclone backend       |
+| Dropbox sync       | 3 (Internet) | Real Dropbox for E2E                  |
 
 ### Escalation Rationale
 

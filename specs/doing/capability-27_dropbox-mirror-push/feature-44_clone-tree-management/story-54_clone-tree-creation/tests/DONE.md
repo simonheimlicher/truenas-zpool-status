@@ -8,18 +8,18 @@
 
 ## Verification Results
 
-| Tool     | Status | Details              |
-|----------|--------|----------------------|
-| Mypy     | PASS   | 0 errors             |
-| Ruff     | PASS   | 0 violations         |
-| pytest   | PASS   | 2/2 tests for story, 73% coverage |
+| Tool   | Status | Details                           |
+| ------ | ------ | --------------------------------- |
+| Mypy   | PASS   | 0 errors                          |
+| Ruff   | PASS   | 0 violations                      |
+| pytest | PASS   | 2/2 tests for story, 73% coverage |
 
 ## Graduated Tests
 
-| Requirement | Test Location                                                                |
-|-------------|------------------------------------------------------------------------------|
-| FR1: Create clone tree from snapshot | `tests/integration/zfs/test_clone_tree_operations.py::TestCreateCloneTree::test_creates_clone_tree_with_children` |
-| FR2: Handle altroot for TrueNAS | Verified via `strip_altroot()` in clone creation path |
+| Requirement                           | Test Location                                                                                                        |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| FR1: Create clone tree from snapshot  | `tests/integration/zfs/test_clone_tree_operations.py::TestCreateCloneTree::test_creates_clone_tree_with_children`    |
+| FR2: Handle altroot for TrueNAS       | Verified via `strip_altroot()` in clone creation path                                                                |
 | FR3: Mount clones if not auto-mounted | `tests/integration/zfs/test_clone_tree_operations.py::TestCreateCloneTree::test_clone_tree_accessible_as_filesystem` |
 
 ## Implementation

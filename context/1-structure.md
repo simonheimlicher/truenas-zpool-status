@@ -14,7 +14,7 @@ See [2-workflow.md](./2-workflow.md) for how these layers connect.
 
 ---
 
-## ⚠️ Critical Distinction: _Requirements Documents_ vs _Work Items_
+## ⚠️ Critical Distinction: *Requirements Documents* vs *Work Items*
 
 **For AI agents:** These are separate concepts that must not be confused.
 

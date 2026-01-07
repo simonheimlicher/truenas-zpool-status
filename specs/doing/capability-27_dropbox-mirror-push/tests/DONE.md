@@ -8,37 +8,37 @@
 
 ## Success Metric Achievement
 
-| Metric | Baseline | Target | Achieved |
-|--------|----------|--------|----------|
-| Automated tests | 0 | Full coverage | 245 tests |
-| Test environment | Manual TrueNAS | Colima VM ZFS | ✅ |
-| CLI parity | dropbox-push.py | cloud-mirror push | ✅ |
+| Metric           | Baseline        | Target            | Achieved  |
+| ---------------- | --------------- | ----------------- | --------- |
+| Automated tests  | 0               | Full coverage     | 245 tests |
+| Test environment | Manual TrueNAS  | Colima VM ZFS     | ✅        |
+| CLI parity       | dropbox-push.py | cloud-mirror push | ✅        |
 
 ## Verification Results
 
-| Tool     | Status | Details                    |
-|----------|--------|----------------------------|
-| Mypy     | PASS   | 0 errors (strict)          |
-| Ruff     | PASS   | 0 violations               |
-| pytest   | PASS   | 245/245 tests passing      |
+| Tool   | Status | Details               |
+| ------ | ------ | --------------------- |
+| Mypy   | PASS   | 0 errors (strict)     |
+| Ruff   | PASS   | 0 violations          |
+| pytest | PASS   | 245/245 tests passing |
 
 ## Features Completed
 
-| Feature | Status | Tests |
-|---------|--------|-------|
-| feature-27_zfs-snapshot-operations | DONE | ZFS list, create, destroy snapshots |
-| feature-44_clone-tree-management | DONE | Clone tree create/destroy with hierarchy |
-| feature-61_rclone-push-sync | DONE | rclone sync with version backup |
-| feature-78_push-cli | DONE | CLI, orchestrator, locking, integration |
+| Feature                            | Status | Tests                                    |
+| ---------------------------------- | ------ | ---------------------------------------- |
+| feature-27_zfs-snapshot-operations | DONE   | ZFS list, create, destroy snapshots      |
+| feature-44_clone-tree-management   | DONE   | Clone tree create/destroy with hierarchy |
+| feature-61_rclone-push-sync        | DONE   | rclone sync with version backup          |
+| feature-78_push-cli                | DONE   | CLI, orchestrator, locking, integration  |
 
 ## Capability E2E Tests
 
-| Requirement | Test Location | Status |
-|-------------|---------------|--------|
-| EI1: Full push workflow | `tests/integration/push/test_integration.py` | PASS* |
-| EI2: Nested datasets | `tests/integration/zfs/test_clone_tree_operations.py` | PASS |
-| EI3: Symlinks preserved | `tests/integration/rclone/test_basic_sync.py::test_symlink_handled` | PASS |
-| EI4: Version backup | `tests/integration/rclone/test_dropbox_sync.py::TestDropboxVersionBackup` | PASS |
+| Requirement             | Test Location                                                             | Status |
+| ----------------------- | ------------------------------------------------------------------------- | ------ |
+| EI1: Full push workflow | `tests/integration/push/test_integration.py`                              | PASS*  |
+| EI2: Nested datasets    | `tests/integration/zfs/test_clone_tree_operations.py`                     | PASS   |
+| EI3: Symlinks preserved | `tests/integration/rclone/test_basic_sync.py::test_symlink_handled`       | PASS   |
+| EI4: Version backup     | `tests/integration/rclone/test_dropbox_sync.py::TestDropboxVersionBackup` | PASS   |
 
 *Note: Full end-to-end sync is limited in dev environment (ZFS in VM, rclone on host).
 Verified via component tests; production testing on TrueNAS confirms full workflow.
@@ -47,12 +47,12 @@ Verified via component tests; production testing on TrueNAS confirms full workfl
 
 ### Core Modules
 
-| File | Purpose | Lines |
-|------|---------|-------|
-| `cloud_mirror/zfs.py` | ZFS operations (list, snapshot, clone) | ~600 |
-| `cloud_mirror/rclone.py` | rclone sync operations | ~850 |
-| `cloud_mirror/cli.py` | CLI argument parsing | ~190 |
-| `cloud_mirror/push.py` | Orchestrator, locking, RealPushOperations | ~925 |
+| File                     | Purpose                                   | Lines |
+| ------------------------ | ----------------------------------------- | ----- |
+| `cloud_mirror/zfs.py`    | ZFS operations (list, snapshot, clone)    | ~600  |
+| `cloud_mirror/rclone.py` | rclone sync operations                    | ~850  |
+| `cloud_mirror/cli.py`    | CLI argument parsing                      | ~190  |
+| `cloud_mirror/push.py`   | Orchestrator, locking, RealPushOperations | ~925  |
 
 ### Key Capabilities
 

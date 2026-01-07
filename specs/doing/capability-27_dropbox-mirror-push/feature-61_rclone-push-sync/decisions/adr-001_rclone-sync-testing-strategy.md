@@ -44,29 +44,31 @@ Each testing level adds dependencies but also adds confidence that lower levels 
 
 ### Level Assignments
 
-| Component | Level | Justification |
-|-----------|-------|---------------|
-| `build_rclone_command()` | 1 (Unit) | Pure function, no I/O |
-| `parse_rclone_error()` | 1 (Unit) | Pure parsing logic |
-| `parse_rclone_output()` (verbosity) | 1 (Unit) | Pure string filtering |
-| `get_version_backup_path()` | 1 (Unit) | Pure path manipulation |
-| Basic sync to local remote | 2 (VM) | Need real rclone, local backend sufficient |
-| Symlink → .rclonelink conversion | 2 (VM) | rclone behavior, local backend works |
-| Directory structure preservation | 2 (VM) | Filesystem behavior |
-| Version backup file operations | 2 (VM) | rclone --backup-dir, local backend works |
-| **Dropbox OAuth authentication** | **3 (Internet)** | REQUIRES real Dropbox |
-| **Rate limit handling (429 errors)** | **3 (Internet)** | REQUIRES real Dropbox API |
-| **Dropbox mtime preservation** | **3 (Internet)** | Dropbox-specific behavior |
-| **Real sync verification** | **3 (Internet)** | End-to-end confidence |
-| Production config works | 4 (Preflight) | Environment-specific |
-| Remote is accessible | 4 (Preflight) | Runtime verification |
+| Component                            | Level            | Justification                              |
+| ------------------------------------ | ---------------- | ------------------------------------------ |
+| `build_rclone_command()`             | 1 (Unit)         | Pure function, no I/O                      |
+| `parse_rclone_error()`               | 1 (Unit)         | Pure parsing logic                         |
+| `parse_rclone_output()` (verbosity)  | 1 (Unit)         | Pure string filtering                      |
+| `get_version_backup_path()`          | 1 (Unit)         | Pure path manipulation                     |
+| Basic sync to local remote           | 2 (VM)           | Need real rclone, local backend sufficient |
+| Symlink → .rclonelink conversion     | 2 (VM)           | rclone behavior, local backend works       |
+| Directory structure preservation     | 2 (VM)           | Filesystem behavior                        |
+| Version backup file operations       | 2 (VM)           | rclone --backup-dir, local backend works   |
+| **Dropbox OAuth authentication**     | **3 (Internet)** | REQUIRES real Dropbox                      |
+| **Rate limit handling (429 errors)** | **3 (Internet)** | REQUIRES real Dropbox API                  |
+| **Dropbox mtime preservation**       | **3 (Internet)** | Dropbox-specific behavior                  |
+| **Real sync verification**           | **3 (Internet)** | End-to-end confidence                      |
+| Production config works              | 4 (Preflight)    | Environment-specific                       |
+| Remote is accessible                 | 4 (Preflight)    | Runtime verification                       |
 
 ### Escalation Rationale
 
 **Level 1 → 2:**
+
 > "Unit tests prove command building logic is correct, but cannot verify rclone actually accepts our commands or syncs files correctly."
 
 **Level 2 → 3:**
+
 > "VM tests prove rclone syncs files with local backend, but cannot verify:
 >
 > - OAuth token refresh works
@@ -76,6 +78,7 @@ Each testing level adds dependencies but also adds confidence that lower levels 
 > - Real network latency and timeout handling"
 
 **Level 3 → 4:**
+
 > "Test account works in CI, but production may have:
 >
 > - Different rclone config location
@@ -117,15 +120,15 @@ Each testing level adds dependencies but also adds confidence that lower levels 
 
 ### Behaviors That MUST Be Tested at Level 3
 
-| Behavior | Why Level 2 Is Insufficient |
-|----------|----------------------------|
-| OAuth authentication | Local backend has no OAuth |
-| Token refresh on expiry | Local backend never expires |
-| Rate limit retry (429 → backoff → retry) | Local backend never rate limits |
-| `--tpslimit 12` effectiveness | Only real API rate limits |
-| Dropbox-specific error messages | Local errors differ from API errors |
-| Network timeout handling | No network in local backend |
-| Idempotent sync verification | Need real checksums from Dropbox |
+| Behavior                                 | Why Level 2 Is Insufficient         |
+| ---------------------------------------- | ----------------------------------- |
+| OAuth authentication                     | Local backend has no OAuth          |
+| Token refresh on expiry                  | Local backend never expires         |
+| Rate limit retry (429 → backoff → retry) | Local backend never rate limits     |
+| `--tpslimit 12` effectiveness            | Only real API rate limits           |
+| Dropbox-specific error messages          | Local errors differ from API errors |
+| Network timeout handling                 | No network in local backend         |
+| Idempotent sync verification             | Need real checksums from Dropbox    |
 
 ### Level 3 Test Cases (Required)
 

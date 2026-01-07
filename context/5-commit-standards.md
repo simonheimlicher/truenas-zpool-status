@@ -43,6 +43,7 @@ git add scripts/start-test-vm.sh specs/doing/capability-10_colima-test-environme
 ```
 
 **Staging Rules:**
+
 - [ ] **One Story Per Commit**: Only stage files related to the single story/issue being fixed
 - [ ] **Review Untracked Files**: Run `git status` and consciously decide about each `??` file
 - [ ] **Exclude Experimental Work**: Never stage files from other stories unless explicitly related
@@ -59,6 +60,7 @@ git diff --cached --name-only
 ```
 
 **Review Checklist:**
+
 - [ ] **File Count Reasonable**: Does the number of files match the scope of your fix?
 - [ ] **No Surprise Files**: Are there files you didn't intend to modify?
 - [ ] **No Unrelated Changes**: Are all changes related to the single issue being fixed?
@@ -87,19 +89,19 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 
 ## Commit Types
 
-| Type         | Purpose                                        | SemVer Impact | Examples                                                      |
-| ------------ | ---------------------------------------------- | ------------- | ------------------------------------------------------------- |
-| **feat**     | New capability                                 | MINOR         | `feat: add clone tree management for snapshot sync`           |
-| **fix**      | Bug fix                                        | PATCH         | `fix: handle unmounted dataset in recursive snapshot`         |
-| **docs**     | Documentation changes                          | PATCH         | `docs: update CLI usage examples`                             |
-| **style**    | Code formatting (no logic change)              | PATCH         | `style: apply black formatting to sync module`                |
-| **refactor** | Code restructure, architecture improvements    | PATCH         | `refactor: extract ZFS operations into separate module`       |
-| **perf**     | Performance improvements                       | PATCH         | `perf: batch rclone operations to reduce API calls`           |
-| **test**     | Add or modify tests                            | PATCH         | `test: add integration tests for Colima VM setup`             |
-| **ci**       | CI/CD pipeline changes                         | PATCH         | `ci: add automated test workflow`                             |
-| **build**    | Build system or dependencies                   | PATCH         | `build: add pytest dependency to pyproject.toml`              |
-| **revert**   | Revert previous commit                         | PATCH         | `revert: "feat: add experimental sync mode"`                  |
-| **ctx**      | Context, workflow, AI/human collaboration      | PATCH         | `ctx: add BSP numbering guidance to structure doc`            |
+| Type         | Purpose                                     | SemVer Impact | Examples                                                |
+| ------------ | ------------------------------------------- | ------------- | ------------------------------------------------------- |
+| **feat**     | New capability                              | MINOR         | `feat: add clone tree management for snapshot sync`     |
+| **fix**      | Bug fix                                     | PATCH         | `fix: handle unmounted dataset in recursive snapshot`   |
+| **docs**     | Documentation changes                       | PATCH         | `docs: update CLI usage examples`                       |
+| **style**    | Code formatting (no logic change)           | PATCH         | `style: apply black formatting to sync module`          |
+| **refactor** | Code restructure, architecture improvements | PATCH         | `refactor: extract ZFS operations into separate module` |
+| **perf**     | Performance improvements                    | PATCH         | `perf: batch rclone operations to reduce API calls`     |
+| **test**     | Add or modify tests                         | PATCH         | `test: add integration tests for Colima VM setup`       |
+| **ci**       | CI/CD pipeline changes                      | PATCH         | `ci: add automated test workflow`                       |
+| **build**    | Build system or dependencies                | PATCH         | `build: add pytest dependency to pyproject.toml`        |
+| **revert**   | Revert previous commit                      | PATCH         | `revert: "feat: add experimental sync mode"`            |
+| **ctx**      | Context, workflow, AI/human collaboration   | PATCH         | `ctx: add BSP numbering guidance to structure doc`      |
 
 ## Type Selection Guidelines
 
@@ -183,17 +185,17 @@ Any type can include:
 
 ### Common Scopes
 
-| Scope      | Purpose                                           |
-| ---------- | ------------------------------------------------- |
-| `zfs`      | ZFS snapshot, clone, dataset operations           |
-| `rclone`   | rclone sync, remote configuration                 |
-| `vm`       | Colima VM setup and management scripts            |
-| `clone`    | Clone tree creation and cleanup                   |
-| `cli`      | CLI argument parsing, direction detection         |
-| `sync`     | Core sync module (cloud-mirror.py)                        |
-| `context`  | Context documentation (`context/*.md`)            |
-| `template` | Work item templates (`context/templates/`)        |
-| `spec`     | Specifications (`specs/` work items, ADRs)        |
+| Scope      | Purpose                                    |
+| ---------- | ------------------------------------------ |
+| `zfs`      | ZFS snapshot, clone, dataset operations    |
+| `rclone`   | rclone sync, remote configuration          |
+| `vm`       | Colima VM setup and management scripts     |
+| `clone`    | Clone tree creation and cleanup            |
+| `cli`      | CLI argument parsing, direction detection  |
+| `sync`     | Core sync module (cloud-mirror.py)         |
+| `context`  | Context documentation (`context/*.md`)     |
+| `template` | Work item templates (`context/templates/`) |
+| `spec`     | Specifications (`specs/` work items, ADRs) |
 
 ## Quick Reference Decision Tree
 

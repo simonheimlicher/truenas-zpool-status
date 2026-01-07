@@ -12,14 +12,14 @@
 
 ### EI1: [Cross-feature integration test]
 
-GIVEN [multiple features are implemented]  
-WHEN [user/system performs capability-level workflow]  
+GIVEN [multiple features are implemented]\
+WHEN [user/system performs capability-level workflow]\
 THEN [cohesive functionality delivers measurable value]
 
 ### EI2: [Additional integration test if needed]
 
-GIVEN [capability prerequisites]  
-WHEN [complex capability interaction]  
+GIVEN [capability prerequisites]\
+WHEN [complex capability interaction]\
 THEN [expected integrated behavior across features]
 
 ## System Integration

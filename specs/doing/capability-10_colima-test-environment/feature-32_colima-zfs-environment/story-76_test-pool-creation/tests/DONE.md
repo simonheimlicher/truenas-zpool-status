@@ -6,19 +6,19 @@ Story-76 verifies that the testpool exists, is healthy, and supports dataset ope
 
 ## Graduated Tests
 
-| Requirement | Graduated To |
-| ----------- | ------------ |
-| FR1: Pool exists | `tests/environment/test_pool.py::TestPoolCreation::test_pool_exists` |
-| FR1: Pool healthy | `tests/environment/test_pool.py::TestPoolCreation::test_pool_is_healthy` |
-| FR1: Pool file exists | `tests/environment/test_pool.py::TestPoolCreation::test_pool_file_exists` |
-| FR3: Create dataset | `tests/environment/test_pool.py::TestDatasetOperations::test_can_create_dataset` |
+| Requirement            | Graduated To                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| FR1: Pool exists       | `tests/environment/test_pool.py::TestPoolCreation::test_pool_exists`                       |
+| FR1: Pool healthy      | `tests/environment/test_pool.py::TestPoolCreation::test_pool_is_healthy`                   |
+| FR1: Pool file exists  | `tests/environment/test_pool.py::TestPoolCreation::test_pool_file_exists`                  |
+| FR3: Create dataset    | `tests/environment/test_pool.py::TestDatasetOperations::test_can_create_dataset`           |
 | FR3: Multiple datasets | `tests/environment/test_pool.py::TestDatasetOperations::test_can_create_multiple_datasets` |
-| FR4: Dataset isolation | `tests/environment/test_pool.py::TestDatasetOperations::test_destroy_one_preserves_other` |
+| FR4: Dataset isolation | `tests/environment/test_pool.py::TestDatasetOperations::test_destroy_one_preserves_other`  |
 
 ## Tests Remaining in Specs
 
-| Test | Rationale |
-| ---- | --------- |
+| Test                    | Rationale                                                    |
+| ----------------------- | ------------------------------------------------------------ |
 | `test_pool_creation.py` | Kept as reference; graduated version in `tests/environment/` |
 
 ## Changes Made During Graduation

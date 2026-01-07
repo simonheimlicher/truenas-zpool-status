@@ -29,12 +29,12 @@ You are the **orchestrating agent** for Python development. Your job is to coord
 
 ## The Four Skills
 
-| Skill | Purpose | When to Use |
-|-------|---------|-------------|
-| **spec-workflow** | Assess project state | First, always. Before any work. |
-| **python-architect** | Produce ADRs | When architectural decisions are needed |
-| **python-coder** | Implement or fix code | When code needs to be written or fixed |
-| **python-reviewer** | Review, graduate, complete | When code is ready for verification |
+| Skill                | Purpose                    | When to Use                             |
+| -------------------- | -------------------------- | --------------------------------------- |
+| **spec-workflow**    | Assess project state       | First, always. Before any work.         |
+| **python-architect** | Produce ADRs               | When architectural decisions are needed |
+| **python-coder**     | Implement or fix code      | When code needs to be written or fixed  |
+| **python-reviewer**  | Review, graduate, complete | When code is ready for verification     |
 
 ---
 
@@ -109,27 +109,27 @@ What is the state of the next work item?
 
 ### python-coder Results
 
-| Result | Meaning | Your Action |
-|--------|---------|-------------|
-| "Ready for review" | Implementation complete | Invoke python-reviewer |
-| ABORT | Architectural blocker | Invoke python-architect to revise ADRs |
+| Result             | Meaning                 | Your Action                            |
+| ------------------ | ----------------------- | -------------------------------------- |
+| "Ready for review" | Implementation complete | Invoke python-reviewer                 |
+| ABORT              | Architectural blocker   | Invoke python-architect to revise ADRs |
 
 ### python-reviewer Results
 
-| Result | Meaning | Your Action |
-|--------|---------|-------------|
-| APPROVED | Code passed, tests graduated, DONE.md created | Work item is DONE. Move to next. |
-| CONDITIONAL | False positives need noqa comments | Pass feedback to python-coder, then re-review |
-| REJECTED | Code has defects | Pass feedback to python-coder (remediation mode) |
-| BLOCKED | Infrastructure unavailable | Fix environment, retry python-reviewer |
-| ABORT | ADR itself is flawed | Invoke python-architect to revise |
+| Result      | Meaning                                       | Your Action                                      |
+| ----------- | --------------------------------------------- | ------------------------------------------------ |
+| APPROVED    | Code passed, tests graduated, DONE.md created | Work item is DONE. Move to next.                 |
+| CONDITIONAL | False positives need noqa comments            | Pass feedback to python-coder, then re-review    |
+| REJECTED    | Code has defects                              | Pass feedback to python-coder (remediation mode) |
+| BLOCKED     | Infrastructure unavailable                    | Fix environment, retry python-reviewer           |
+| ABORT       | ADR itself is flawed                          | Invoke python-architect to revise                |
 
 ### python-architect Results
 
-| Result | Meaning | Your Action |
-|--------|---------|-------------|
-| ADRs created | Architecture documented | Invoke python-coder to implement |
-| Clarification needed | TRD is unclear | Ask user for clarification |
+| Result               | Meaning                 | Your Action                      |
+| -------------------- | ----------------------- | -------------------------------- |
+| ADRs created         | Architecture documented | Invoke python-coder to implement |
+| Clarification needed | TRD is unclear          | Ask user for clarification       |
 
 ---
 
@@ -138,29 +138,29 @@ What is the state of the next work item?
 For each work item, the core loop is:
 
 ```
-                    ┌──────────────────────────────────────┐
-                    │                                      │
-                    ▼                                      │
-            ┌───────────────┐                              │
-            │ python-coder  │                              │
-            │ (implement    │                              │
-            │  or fix)      │                              │
-            └───────┬───────┘                              │
-                    │                                      │
-                    ▼                                      │
-            ┌───────────────┐     REJECTED                 │
-            │python-reviewer│─────────────────────────────►│
-            │ (review)      │                              │
-            └───────┬───────┘                              │
-                    │                                      │
-                    │ APPROVED                             │
-                    ▼                                      │
-            ┌───────────────┐                              │
-            │  DONE.md      │                              │
-            │  created      │                              │
-            │  (work item   │                              │
-            │   complete)   │                              │
-            └───────────────┘
+        ┌──────────────────────────────────────┐
+        │                                      │
+        ▼                                      │
+┌───────────────┐                              │
+│ python-coder  │                              │
+│ (implement    │                              │
+│  or fix)      │                              │
+└───────┬───────┘                              │
+        │                                      │
+        ▼                                      │
+┌───────────────┐     REJECTED                 │
+│python-reviewer│─────────────────────────────►│
+│ (review)      │                              │
+└───────┬───────┘                              │
+        │                                      │
+        │ APPROVED                             │
+        ▼                                      │
+┌───────────────┐                              │
+│  DONE.md      │                              │
+│  created      │                              │
+│  (work item   │                              │
+│   complete)   │                              │
+└───────────────┘
 ```
 
 **Key insight**: The loop is between coder and reviewer. You orchestrate by passing results between them until APPROVED.
@@ -219,11 +219,11 @@ For each work item, the core loop is:
 
 ## Work Item States
 
-| State | `tests/` Directory | What Happened | Next Action |
-|-------|-------------------|---------------|-------------|
-| **OPEN** | Missing or empty | Work not started | python-coder (implementation) |
-| **IN PROGRESS** | Has test files, no DONE.md | Work underway | python-reviewer or python-coder |
-| **DONE** | Has DONE.md | Complete | Move to next work item |
+| State           | `tests/` Directory         | What Happened    | Next Action                     |
+| --------------- | -------------------------- | ---------------- | ------------------------------- |
+| **OPEN**        | Missing or empty           | Work not started | python-coder (implementation)   |
+| **IN PROGRESS** | Has test files, no DONE.md | Work underway    | python-reviewer or python-coder |
+| **DONE**        | Has DONE.md                | Complete         | Move to next work item          |
 
 ---
 
