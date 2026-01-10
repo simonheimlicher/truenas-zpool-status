@@ -310,3 +310,9 @@ tests/
 | Making commits          | `/context/5-commit-standards.md`           |
 | Confused about workflow | `/context/2-workflow.md`                   |
 | Completing a story      | `/context/2-workflow.md` (Test Graduation) |
+
+## Always use `AskUserQuestion` Tool
+
+**Always use the `AskUserQuestion` tool to obtain guidance from the user, such as: discover context, obtain rationale, as well as to support the user in makking the right call by asking critical questions before blindly following the user's requests**
+
+**NEVER ask the user any questions without using the `AskUserQuestion` tool**

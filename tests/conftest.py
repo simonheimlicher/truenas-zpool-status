@@ -1,5 +1,5 @@
 """
-Pytest fixtures for ZFS and rclone testing.
+Pytest fixtures for ZFS, rclone, and git testing.
 
 IMPORTANT: Development vs Production Environment
 - Development (macOS): ZFS runs inside Colima VM, accessed via SSH
@@ -12,6 +12,7 @@ Test Categories:
 - Unit tests: Run anywhere (no ZFS needed) - direction detection, validation
 - VM tests: Require Colima VM running with ZFS installed
 - Internet tests: Require DROPBOX_TEST_TOKEN for real Dropbox (Level 3)
+- Git tests: Use real git fixtures in tmp_path (not mocks)
 
 Usage:
   # Run all tests (some may skip if VM not running)
@@ -36,6 +37,8 @@ from pathlib import Path
 from typing import Generator
 
 import pytest
+
+from tests.fixtures.git_fixtures import GitRepo, with_git_repo
 
 # Load .env file if python-dotenv is available
 try:
@@ -362,3 +365,25 @@ def dropbox_test_folder(
             capture_output=True,
             timeout=60,
         )
+
+
+# =============================================================================
+# Fixtures - Git (for update testing)
+# =============================================================================
+
+
+@pytest.fixture
+def git_repo(tmp_path: Path) -> Generator[GitRepo, None, None]:
+    """Provide a git repository fixture for tests.
+
+    Creates a temporary git repository in tmp_path with initial setup.
+    Uses real git commands (not mocks) per ADR-003.
+
+    Example:
+        def test_git_operations(git_repo):
+            git_repo.create_commit("Test", {"file.txt": "content"})
+            git_repo.create_tag("v1.0.0")
+            assert git_repo.current_branch() == "main"
+    """
+    with with_git_repo(tmp_path) as repo:
+        yield repo

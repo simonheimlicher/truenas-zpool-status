@@ -73,13 +73,26 @@ def _create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "source",
         type=str,
+        nargs="?",
+        default=None,
         help="Source (dataset for mirror-to-cloud, remote for mirror-from-cloud)",
     )
 
     parser.add_argument(
         "destination",
         type=str,
+        nargs="?",
+        default=None,
         help="Destination (remote for mirror-to-cloud, dataset for mirror-from-cloud)",
+    )
+
+    # Profile configuration
+    parser.add_argument(
+        "--profile",
+        type=str,
+        default=None,
+        metavar="NAME",
+        help="Load settings from named profile in cloud-mirror.toml",
     )
 
     # Common options
