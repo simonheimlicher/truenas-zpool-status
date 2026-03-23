@@ -1,49 +1,33 @@
 [project]
-name = "cloud-mirror"
+name = "zpool-status"
 version = "0.1.0"
-description = "Mirror ZFS datasets to/from cloud storage for TrueNAS SCALE"
+description = "Enhanced zpool status with disk model and serial number info for TrueNAS SCALE"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
-
-[project.scripts]
-cloud-mirror = "cloud_mirror.main:main"
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
   "pytest-cov>=4.0",
-  "python-dotenv>=1.0",
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "specs"]
+testpaths = ["tests"]
 markers = [
-  "zfs: mark test as requiring ZFS (deselect with '-m \"not zfs\"')",
-  "vm_required: mark test as requiring Colima VM to be running",
-  "internet_required: mark test as requiring internet and DROPBOX_TEST_TOKEN",
   "slow: mark test as slow-running",
 ]
 
 [tool.ruff.lint]
-# Enable specific rule sets
-# B: Bugbear (potential bugs)
-# S: Bandit (security - detects hardcoded secrets/passwords)
-# PT: Pytest Style (enforces proper testing patterns)
-# T20: Print (no print statements, use logging)
 select = ["B", "S", "PT", "T20"]
 
 [tool.ruff.lint.per-file-ignores]
-# Allow asserts in tests
 "tests/*" = ["S101"]
-"specs/*" = ["S101"]
 
 [tool.mypy]
-# The "Zero Trust" Typing Configuration
 strict = true
 disallow_untyped_defs = true
 disallow_any_generics = true
 no_implicit_optional = true
 warn_return_any = true
-# Force mypy to check untyped functions too
 check_untyped_defs = true

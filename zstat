@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Standalone wrapper for cloud-mirror.
+"""Standalone wrapper for zpool-status.
 
-Resolves its own location to find the cloud_mirror package,
+Resolves its own location to find the zpool_status package,
 adds parent directory to sys.path, and invokes main().
 
 This wrapper supports:
-- Direct execution: ./cloud-mirror [args]
-- Symlinked execution: /usr/local/bin/cloud-mirror → /path/to/cloud-mirror
+- Direct execution: ./zstat [args]
+- Symlinked execution: /usr/local/bin/zstat → /path/to/zstat
 - Invocation from any working directory
+
+Deployment on TrueNAS:
+  git clone <repo> /opt/zpool-status
+  ln -s /opt/zpool-status/zstat /usr/local/bin/zstat
 """
 import sys
 from pathlib import Path
@@ -15,12 +19,12 @@ from pathlib import Path
 # Resolve wrapper location (handles symlinks)
 wrapper_path = Path(__file__).resolve()
 package_parent = wrapper_path.parent
-package_dir = package_parent / "cloud_mirror"
+package_dir = package_parent / "zpool_status"
 
 # Verify package exists
 if not package_dir.exists():
     print(
-        f"Error: cloud_mirror package not found at {package_dir}",
+        f"Error: zpool_status package not found at {package_dir}",
         file=sys.stderr,
     )
     sys.exit(1)
@@ -29,7 +33,6 @@ if not package_dir.exists():
 if str(package_parent) not in sys.path:
     sys.path.insert(0, str(package_parent))
 
-# Import and invoke main
-from cloud_mirror.main import main
+from zpool_status.main import main
 
-sys.exit(main())
+main()
