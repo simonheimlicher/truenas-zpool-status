@@ -1,4 +1,4 @@
-"""CLI entry point for zstat."""
+"""CLI entry point for zpstat."""
 
 from __future__ import annotations
 
@@ -17,5 +17,5 @@ def main() -> None:
         sys.stdout.write(enriched)
     else:
         print(f"Unknown command: {args[0]}", file=sys.stderr)  # noqa: T201
-        print("Usage: zstat status [pool]", file=sys.stderr)  # noqa: T201
+        print("Usage: zpstat status [pool]", file=sys.stderr)  # noqa: T201
         sys.exit(1)

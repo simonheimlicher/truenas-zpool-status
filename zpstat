@@ -5,13 +5,13 @@ Resolves its own location to find the zpool_status package,
 adds parent directory to sys.path, and invokes main().
 
 This wrapper supports:
-- Direct execution: ./zstat [args]
-- Symlinked execution: /usr/local/bin/zstat → /path/to/zstat
+- Direct execution: ./zpstat [args]
+- Symlinked execution: /usr/local/bin/zpstat → /path/to/zpstat
 - Invocation from any working directory
 
 Deployment on TrueNAS:
-  git clone <repo> /opt/zpool-status
-  ln -s /opt/zpool-status/zstat /usr/local/bin/zstat
+  git clone <repo> /mnt/system/admin/zpool-status
+  ln -s /mnt/system/admin/zpool-status/zpstat /usr/local/bin/zpstat
 """
 import sys
 from pathlib import Path
