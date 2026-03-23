@@ -438,3 +438,40 @@ class TestUuidDevices:
 
         # Two UUIDs but same base device /dev/sdi — only one smartctl call
         assert call_count == 1
+
+
+FAULTED_POOL_STATUS = """\
+  pool: large1
+ state: ONLINE
+config:
+
+\tNAME        STATE     READ WRITE CKSUM
+\tlarge1      ONLINE       0     0     0
+\t  raidz2-0  ONLINE       0     0     0
+\t    sda     ONLINE       0     0     0
+\t    sdb     ONLINE       0     0     0
+\t    sdc     FAULTED     12   125     0  too many errors
+
+errors: No known data errors
+"""
+
+
+class TestFaultedDevice:
+    def test_trailing_text_after_model_serial(self) -> None:
+        with patch("zpool_status.status.subprocess.run", side_effect=_mock_smartctl):
+            result = enrich_status(FAULTED_POOL_STATUS)
+
+        faulted_line = next(l for l in result.splitlines() if "FAULTED" in l)
+        # MODEL and SERIAL should appear before "too many errors"
+        model_pos = faulted_line.index("Samsung SSD 970 EVO Plus 1TB")
+        serial_pos = faulted_line.index("S4EWNX0NCCC333")
+        errors_pos = faulted_line.index("too many errors")
+        assert model_pos < serial_pos < errors_pos
+
+    def test_healthy_devices_unaffected(self) -> None:
+        with patch("zpool_status.status.subprocess.run", side_effect=_mock_smartctl):
+            result = enrich_status(FAULTED_POOL_STATUS)
+
+        sda_line = next(l for l in result.splitlines() if "sda" in l)
+        assert "WDC WD40EFRX-68N32N0" in sda_line
+        assert "too many errors" not in sda_line

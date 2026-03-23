@@ -188,16 +188,18 @@ def enrich_status(raw_output: str) -> str:
             padded = line.ljust(cksum_end)
             result_lines.append(f"{padded}  {'MODEL'.ljust(model_width)}  SERIAL")
         elif i in disk_infos:
-            # Find the header for this section to get cksum_end
             cksum_end = _cksum_end_for_line(i, sections, lines)
             info = disk_infos[i]
-            padded = line.ljust(cksum_end)
-            result_lines.append(
-                f"{padded}  {info.model.ljust(model_width)}  {info.serial}"
-            )
+            # Separate the fixed columns from any trailing text (e.g. "too many errors")
+            fixed_part = line[:cksum_end].ljust(cksum_end)
+            trailing = line[cksum_end:].strip()
+            enriched = f"{fixed_part}  {info.model.ljust(model_width)}  {info.serial.ljust(serial_width)}"
+            if trailing:
+                enriched = f"{enriched}  {trailing}"
+            result_lines.append(enriched)
         elif i in section_ranges:
             cksum_end = _cksum_end_for_line(i, sections, lines)
-            padded = line.ljust(cksum_end)
+            padded = line[:cksum_end].ljust(cksum_end)
             result_lines.append(padded)
         else:
             result_lines.append(line)
