@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from dataclasses import dataclass
@@ -11,6 +12,14 @@ from dataclasses import dataclass
 class DiskInfo:
     model: str
     serial: str
+
+
+_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+# Patterns that are NOT physical devices in zpool status config section
+_VDEV_TYPES = re.compile(
+    r"^(mirror|raidz[123]?|spare|cache|log|special|dedup|replacing|spare)-?\d*$"
+)
 
 
 def get_zpool_status(pool: str | None = None) -> str:
@@ -26,9 +35,51 @@ def get_zpool_status(pool: str | None = None) -> str:
     return result.stdout
 
 
+def resolve_device_path(name: str) -> str:
+    """Resolve a device name to a path smartctl can query.
+
+    Handles:
+    - UUIDs: resolved via /dev/disk/by-partuuid/, then stripped to base device
+    - Partition names (sdi3, nvme0n1p2): stripped to base device (sdi, nvme0n1)
+    - Plain device names (sda): returned as /dev/sda
+    """
+    if _UUID_RE.match(name):
+        partuuid_path = f"/dev/disk/by-partuuid/{name}"
+        try:
+            target = os.readlink(partuuid_path)
+            # target is relative like "../../sda1", extract the device name
+            partition = os.path.basename(target)
+            return f"/dev/{_strip_partition(partition)}"
+        except OSError:
+            return f"/dev/disk/by-partuuid/{name}"
+
+    if name.startswith("/"):
+        return name
+
+    return f"/dev/{_strip_partition(name)}"
+
+
+def _strip_partition(name: str) -> str:
+    """Strip partition suffix to get the base device.
+
+    nvme0n1p2 -> nvme0n1  (NVMe: strip pN suffix)
+    sdi3      -> sdi      (SATA/SCSI: strip trailing digits)
+    sda       -> sda      (no partition, unchanged)
+    """
+    # NVMe: /dev/nvme0n1p2 -> /dev/nvme0n1
+    nvme_match = re.match(r"^(nvme\d+n\d+)p\d+$", name)
+    if nvme_match:
+        return nvme_match.group(1)
+    # SATA/SCSI: /dev/sdi3 -> /dev/sdi
+    sata_match = re.match(r"^(sd[a-z]+)\d+$", name)
+    if sata_match:
+        return sata_match.group(1)
+    return name
+
+
 def get_disk_info(device: str) -> DiskInfo:
     """Query smartctl for disk model and serial number."""
-    dev_path = device if device.startswith("/") else f"/dev/{device}"
+    dev_path = resolve_device_path(device)
     result = subprocess.run(
         ["smartctl", "-i", dev_path],
         capture_output=True,
@@ -45,107 +96,121 @@ def get_disk_info(device: str) -> DiskInfo:
     return DiskInfo(model=model, serial=serial)
 
 
-# Patterns that are NOT physical devices in zpool status config section
-_VDEV_TYPES = re.compile(
-    r"^(mirror|raidz[123]?|spare|cache|log|special|dedup|replacing|spare)-?\d*$"
-)
-
-
 def is_physical_device(name: str) -> bool:
     """Check if a name in zpool status represents a physical device (not a vdev or pool)."""
     if _VDEV_TYPES.match(name):
         return False
-    # Devices are typically sdX, nvmeXnYpZ, daX, or /dev/disk/by-id/... paths
-    # They appear as leaf nodes under vdevs.
-    # We detect them by exclusion: not a vdev type, and appears indented under config.
     return True
 
 
-def _find_config_section(lines: list[str]) -> tuple[int, int]:
-    """Find the start and end of the config section in zpool status output.
+def _find_config_sections(lines: list[str]) -> list[tuple[int, int]]:
+    """Find all config sections in zpool status output.
 
-    Returns (header_line_index, end_index) where header_line is the NAME/STATE/... line.
+    Returns list of (header_line_index, end_index) tuples.
     """
-    config_start = -1
-    for i, line in enumerate(lines):
-        if line.strip().startswith("NAME") and "STATE" in line:
-            config_start = i
-            break
-    if config_start == -1:
-        return -1, -1
-
-    # Config section ends at the next blank line or "errors:" line
-    config_end = len(lines)
-    for i in range(config_start + 1, len(lines)):
-        stripped = lines[i].strip()
-        if stripped == "" or stripped.startswith("errors:"):
-            config_end = i
-            break
-    return config_start, config_end
+    sections = []
+    i = 0
+    while i < len(lines):
+        if lines[i].strip().startswith("NAME") and "STATE" in lines[i]:
+            header_idx = i
+            # Config section ends at blank line or "errors:" line
+            end_idx = len(lines)
+            for j in range(header_idx + 1, len(lines)):
+                stripped = lines[j].strip()
+                if stripped == "" or stripped.startswith("errors:"):
+                    end_idx = j
+                    break
+            sections.append((header_idx, end_idx))
+            i = end_idx
+        else:
+            i += 1
+    return sections
 
 
 def enrich_status(raw_output: str) -> str:
     """Add MODEL and SERIAL columns to zpool status output for physical devices."""
     lines = raw_output.splitlines()
-    header_idx, config_end = _find_config_section(lines)
-    if header_idx == -1:
+    sections = _find_config_sections(lines)
+    if not sections:
         return raw_output
 
-    header = lines[header_idx]
-    # Parse column positions from the header
-    # Typical: "\tNAME        STATE     READ WRITE CKSUM"
-    cksum_end = header.rfind("CKSUM")
-    if cksum_end == -1:
-        return raw_output
-    cksum_end += len("CKSUM")
+    # First pass: collect all physical devices across all sections
+    # Maps line_index -> device_name
+    all_device_lines: dict[int, str] = {}
+    pool_lines: set[int] = set()  # lines that are pool names (first line after header)
+    section_ranges: set[int] = set()  # all line indices within any config section
 
-    # Collect disk info for all physical devices first (batch to avoid repeated calls)
-    device_lines: list[tuple[int, str]] = []  # (line_index, device_name)
-    pool_name: str | None = None
+    for header_idx, config_end in sections:
+        pool_found = False
+        for i in range(header_idx + 1, config_end):
+            section_ranges.add(i)
+            parts = lines[i].split()
+            if not parts:
+                continue
+            name = parts[0]
+            if not pool_found:
+                pool_lines.add(i)
+                pool_found = True
+                continue
+            if is_physical_device(name):
+                all_device_lines[i] = name
 
-    for i in range(header_idx + 1, config_end):
-        parts = lines[i].split()
-        if not parts:
-            continue
-        name = parts[0]
-        # First non-empty line after header is the pool name
-        if pool_name is None:
-            pool_name = name
-            continue
-        if is_physical_device(name):
-            device_lines.append((i, name))
-
-    if not device_lines:
+    if not all_device_lines:
         return raw_output
 
-    # Query smartctl for each device
+    # Query smartctl for each unique base device (avoid duplicate queries)
     disk_infos: dict[int, DiskInfo] = {}
-    for line_idx, dev_name in device_lines:
-        disk_infos[line_idx] = get_disk_info(dev_name)
+    cache: dict[str, DiskInfo] = {}
+    for line_idx, dev_name in all_device_lines.items():
+        dev_path = resolve_device_path(dev_name)
+        if dev_path not in cache:
+            cache[dev_path] = get_disk_info(dev_name)
+        disk_infos[line_idx] = cache[dev_path]
 
-    # Determine column widths
+    # Determine column widths across ALL pools for consistent alignment
     max_model = max((len(info.model) for info in disk_infos.values()), default=0)
     max_serial = max((len(info.serial) for info in disk_infos.values()), default=0)
     model_width = max(max_model, len("MODEL"))
     serial_width = max(max_serial, len("SERIAL"))
 
+    # Track which lines are headers
+    header_indices = {h for h, _ in sections}
+
     # Build enriched output
     result_lines = []
     for i, line in enumerate(lines):
-        if i == header_idx:
-            # Extend header with new columns
+        if i in header_indices:
+            cksum_end = line.rfind("CKSUM")
+            if cksum_end == -1:
+                result_lines.append(line)
+                continue
+            cksum_end += len("CKSUM")
             padded = line.ljust(cksum_end)
-            result_lines.append(f"{padded}  {('MODEL').ljust(model_width)}  SERIAL")
+            result_lines.append(f"{padded}  {'MODEL'.ljust(model_width)}  SERIAL")
         elif i in disk_infos:
+            # Find the header for this section to get cksum_end
+            cksum_end = _cksum_end_for_line(i, sections, lines)
             info = disk_infos[i]
             padded = line.ljust(cksum_end)
             result_lines.append(
                 f"{padded}  {info.model.ljust(model_width)}  {info.serial}"
             )
-        elif header_idx < i < config_end:
-            # Pool/vdev lines — pad to align but no disk info
+        elif i in section_ranges:
+            cksum_end = _cksum_end_for_line(i, sections, lines)
             padded = line.ljust(cksum_end)
             result_lines.append(padded)
         else:
             result_lines.append(line)
     return "\n".join(result_lines) + "\n"
+
+
+def _cksum_end_for_line(
+    line_idx: int, sections: list[tuple[int, int]], lines: list[str]
+) -> int:
+    """Find the CKSUM column end position for the section containing line_idx."""
+    for header_idx, config_end in sections:
+        if header_idx < line_idx < config_end:
+            pos = lines[header_idx].rfind("CKSUM")
+            if pos != -1:
+                return pos + len("CKSUM")
+    return 0

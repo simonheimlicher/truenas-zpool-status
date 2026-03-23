@@ -6,9 +6,11 @@ from unittest.mock import patch
 
 from zpool_status.status import (
     DiskInfo,
+    _strip_partition,
     enrich_status,
     get_disk_info,
     is_physical_device,
+    resolve_device_path,
 )
 
 SAMPLE_ZPOOL_STATUS = """\
@@ -66,6 +68,71 @@ Model Number:     Samsung SSD 970 EVO Plus 1TB
 Serial Number:    S4EWNX0NDDD444
 """
 
+SAMPLE_SMARTCTL_SDE = """\
+smartctl 7.2 2020-12-30 r5155 [x86_64-linux-5.15.0] (local build)
+
+=== START OF INFORMATION SECTION ===
+Device Model:     Seagate IronWolf 8TB
+Serial Number:    ZCT0EEE555
+"""
+
+SAMPLE_SMARTCTL_NVME = """\
+smartctl 7.4 2023-08-01 r5530 [x86_64-linux-6.1.0] (local build)
+
+=== START OF INFORMATION SECTION ===
+Model Number:     Samsung SSD 980 PRO 500GB
+Serial Number:    S5GXNF0NFFF666
+"""
+
+
+class TestStripPartition:
+    def test_sata_with_partition(self) -> None:
+        assert _strip_partition("sda1") == "sda"
+        assert _strip_partition("sdi3") == "sdi"
+        assert _strip_partition("sdj5") == "sdj"
+
+    def test_sata_without_partition(self) -> None:
+        assert _strip_partition("sda") == "sda"
+        assert _strip_partition("sdz") == "sdz"
+
+    def test_nvme_with_partition(self) -> None:
+        assert _strip_partition("nvme0n1p1") == "nvme0n1"
+        assert _strip_partition("nvme0n1p2") == "nvme0n1"
+        assert _strip_partition("nvme1n1p3") == "nvme1n1"
+
+    def test_nvme_without_partition(self) -> None:
+        assert _strip_partition("nvme0n1") == "nvme0n1"
+
+
+class TestResolveDevicePath:
+    def test_plain_device(self) -> None:
+        assert resolve_device_path("sda") == "/dev/sda"
+
+    def test_partition_stripped(self) -> None:
+        assert resolve_device_path("sdi3") == "/dev/sdi"
+        assert resolve_device_path("nvme0n1p2") == "/dev/nvme0n1"
+
+    def test_absolute_path_passthrough(self) -> None:
+        assert resolve_device_path("/dev/disk/by-id/foo") == "/dev/disk/by-id/foo"
+
+    def test_uuid_resolved_via_readlink(self) -> None:
+        uuid = "23e0b0a2-b80e-43f9-afe7-2618efe4ef73"
+        with patch("zpool_status.status.os.readlink", return_value="../../sdi5"):
+            result = resolve_device_path(uuid)
+        assert result == "/dev/sdi"
+
+    def test_uuid_nvme_resolved(self) -> None:
+        uuid = "3b6737ca-9da2-11ea-aa29-408d5cb328b3"
+        with patch("zpool_status.status.os.readlink", return_value="../../nvme0n1p2"):
+            result = resolve_device_path(uuid)
+        assert result == "/dev/nvme0n1"
+
+    def test_uuid_readlink_failure_falls_back(self) -> None:
+        uuid = "deadbeef-dead-beef-dead-beefdeadbeef"
+        with patch("zpool_status.status.os.readlink", side_effect=OSError):
+            result = resolve_device_path(uuid)
+        assert result == f"/dev/disk/by-partuuid/{uuid}"
+
 
 class TestIsPhysicalDevice:
     def test_sd_devices(self) -> None:
@@ -75,6 +142,10 @@ class TestIsPhysicalDevice:
     def test_nvme_devices(self) -> None:
         assert is_physical_device("nvme0n1")
         assert is_physical_device("nvme0n1p1")
+
+    def test_uuid_devices(self) -> None:
+        assert is_physical_device("23e0b0a2-b80e-43f9-afe7-2618efe4ef73")
+        assert is_physical_device("3b6737ca-9da2-11ea-aa29-408d5cb328b3")
 
     def test_mirror_vdev(self) -> None:
         assert not is_physical_device("mirror-0")
@@ -116,6 +187,20 @@ class TestGetDiskInfo:
         assert info.model == "Samsung SSD 970 EVO Plus 1TB"
         assert info.serial == "S4EWNX0NCCC333"
 
+    def test_uuid_device(self) -> None:
+        with patch("zpool_status.status.os.readlink", return_value="../../sda1"):
+            with patch("zpool_status.status.subprocess.run") as mock_run:
+                mock_run.return_value.stdout = SAMPLE_SMARTCTL_SDA
+                mock_run.return_value.returncode = 0
+                info = get_disk_info("23e0b0a2-b80e-43f9-afe7-2618efe4ef73")
+        assert info.model == "WDC WD40EFRX-68N32N0"
+        assert info.serial == "WD-WCC7K0AAA111"
+        mock_run.assert_called_once_with(
+            ["smartctl", "-i", "/dev/sda"],
+            capture_output=True,
+            text=True,
+        )
+
     def test_absolute_path(self) -> None:
         with patch("zpool_status.status.subprocess.run") as mock_run:
             mock_run.return_value.stdout = SAMPLE_SMARTCTL_SDA
@@ -141,6 +226,8 @@ SMARTCTL_OUTPUTS = {
     "/dev/sdb": SAMPLE_SMARTCTL_SDB,
     "/dev/sdc": SAMPLE_SMARTCTL_SDC,
     "/dev/sdd": SAMPLE_SMARTCTL_SDD,
+    "/dev/sde": SAMPLE_SMARTCTL_SDE,
+    "/dev/nvme0n1": SAMPLE_SMARTCTL_NVME,
 }
 
 
@@ -162,7 +249,6 @@ class TestEnrichStatus:
             result = enrich_status(SAMPLE_ZPOOL_STATUS)
 
         lines = result.splitlines()
-        # Find the header line
         header = next(l for l in lines if "NAME" in l and "STATE" in l)
         assert "MODEL" in header
         assert "SERIAL" in header
@@ -216,3 +302,139 @@ errors: No known data errors
             result = enrich_status(raw)
         assert "WDC WD40EFRX-68N32N0" in result
         assert "WD-WCC7K0AAA111" in result
+
+
+MULTI_POOL_STATUS = """\
+  pool: fast1
+ state: ONLINE
+config:
+
+\tNAME        STATE     READ WRITE CKSUM
+\tfast1       ONLINE       0     0     0
+\t  mirror-0  ONLINE       0     0     0
+\t    sda     ONLINE       0     0     0
+\t    sdb     ONLINE       0     0     0
+
+errors: No known data errors
+
+  pool: large1
+ state: ONLINE
+config:
+
+\tNAME        STATE     READ WRITE CKSUM
+\tlarge1      ONLINE       0     0     0
+\t  raidz2-0  ONLINE       0     0     0
+\t    sdc     ONLINE       0     0     0
+\t    sdd     ONLINE       0     0     0
+\t    sde     ONLINE       0     0     0
+
+errors: No known data errors
+"""
+
+
+class TestMultiPool:
+    def test_all_pools_get_columns(self) -> None:
+        with patch("zpool_status.status.subprocess.run", side_effect=_mock_smartctl):
+            result = enrich_status(MULTI_POOL_STATUS)
+
+        headers = [l for l in result.splitlines() if "NAME" in l and "STATE" in l]
+        assert len(headers) == 2
+        assert all("MODEL" in h and "SERIAL" in h for h in headers)
+
+    def test_all_pools_have_disk_info(self) -> None:
+        with patch("zpool_status.status.subprocess.run", side_effect=_mock_smartctl):
+            result = enrich_status(MULTI_POOL_STATUS)
+
+        # fast1 pool devices
+        assert "WD-WCC7K0AAA111" in result
+        assert "WD-WCC7K0BBB222" in result
+        # large1 pool devices
+        assert "S4EWNX0NCCC333" in result
+        assert "S4EWNX0NDDD444" in result
+        assert "ZCT0EEE555" in result
+
+    def test_each_pool_errors_line_preserved(self) -> None:
+        with patch("zpool_status.status.subprocess.run", side_effect=_mock_smartctl):
+            result = enrich_status(MULTI_POOL_STATUS)
+
+        assert result.count("errors: No known data errors") == 2
+
+
+UUID_POOL_STATUS = """\
+  pool: apps
+ state: ONLINE
+config:
+
+\tNAME                                      STATE     READ WRITE CKSUM
+\tapps                                      ONLINE       0     0     0
+\t  mirror-0                                ONLINE       0     0     0
+\t    23e0b0a2-b80e-43f9-afe7-2618efe4ef73  ONLINE       0     0     0
+\t    4c4d2fb0-ff22-4709-b38c-1360e63b8c68  ONLINE       0     0     0
+
+errors: No known data errors
+"""
+
+
+class TestUuidDevices:
+    def _mock_readlink(self, path: str) -> str:
+        mapping = {
+            "/dev/disk/by-partuuid/23e0b0a2-b80e-43f9-afe7-2618efe4ef73": "../../sda1",
+            "/dev/disk/by-partuuid/4c4d2fb0-ff22-4709-b38c-1360e63b8c68": "../../sdb1",
+        }
+        result = mapping.get(path)
+        if result is None:
+            raise OSError(f"No such file: {path}")
+        return result
+
+    def test_uuid_devices_resolved_and_enriched(self) -> None:
+        with (
+            patch("zpool_status.status.os.readlink", side_effect=self._mock_readlink),
+            patch("zpool_status.status.subprocess.run", side_effect=_mock_smartctl),
+        ):
+            result = enrich_status(UUID_POOL_STATUS)
+
+        assert "MODEL" in result
+        assert "SERIAL" in result
+        assert "WDC WD40EFRX-68N32N0" in result
+        assert "WD-WCC7K0AAA111" in result
+        assert "WD-WCC7K0BBB222" in result
+
+    def test_uuid_devices_same_base_device_cached(self) -> None:
+        """Two UUIDs resolving to the same base device should only call smartctl once."""
+        single_disk_smartctl = {
+            "/dev/sdi": SAMPLE_SMARTCTL_SDA,
+        }
+
+        def mock_readlink(path: str) -> str:
+            # Both UUIDs map to different partitions on same disk
+            mapping = {
+                "/dev/disk/by-partuuid/23e0b0a2-b80e-43f9-afe7-2618efe4ef73": "../../sdi4",
+                "/dev/disk/by-partuuid/4c4d2fb0-ff22-4709-b38c-1360e63b8c68": "../../sdi5",
+            }
+            result = mapping.get(path)
+            if result is None:
+                raise OSError(f"No such file: {path}")
+            return result
+
+        call_count = 0
+
+        def mock_smartctl(cmd: list[str], **kwargs: object) -> object:
+            nonlocal call_count
+            call_count += 1
+            dev = cmd[-1]
+
+            class Result:
+                stdout = single_disk_smartctl.get(dev, "")
+                stderr = ""
+                returncode = 0
+
+            return Result()
+
+        with (
+            patch("zpool_status.status.os.readlink", side_effect=mock_readlink),
+            patch("zpool_status.status.subprocess.run", side_effect=mock_smartctl),
+        ):
+            enrich_status(UUID_POOL_STATUS)
+
+        # Two UUIDs but same base device /dev/sdi — only one smartctl call
+        assert call_count == 1
